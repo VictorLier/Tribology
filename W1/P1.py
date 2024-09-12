@@ -31,7 +31,7 @@ Pres = load / (width * dia * 0.7) # [Pa]  -  0.7 er fundet på
 v = pi * dia * rpm / 60 # [m/s] - Velocity
 Hersey = (visc * v) / (Pres) # [-] - Hersey number
 
-print(f"Hersey number is {Hersey:.2E}")
+print(f"Hersey number is {Hersey:.3G}")
 
 
 # 2
