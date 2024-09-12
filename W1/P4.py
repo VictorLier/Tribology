@@ -50,15 +50,12 @@ plt.ylabel("Height [mu]")
 
 
 # C - Roughness
-Ra = np.mean(height) # Ra
+Ra = np.mean(np.abs(height)) # Ra
 Rq = np.sqrt(np.mean(height**2)) # Rq
 Rt = np.max(height) - np.min(height) # Rt
 
-print(f"Ra: {Ra:.2f} mu")
-print(f"Rq: {Rq:.2f} mu")
-print(f"Rt: {Rt:.2f} mu")
+print(f"Ra: {Ra:.4f} mu")
+print(f"Rq: {Rq:.4f} mu")
+print(f"Rt: {Rt:.4f} mu")
 
 # D - Does it match turning?
-
-
-print("Stop")
