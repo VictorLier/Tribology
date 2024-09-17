@@ -20,10 +20,11 @@ delta_T = 3 # [K] - temperature rise of the lubricant
 # t_q = 4* pi**2 *eta_0 * r**3 * b * N_a / c
 # rearranging the equation to solve for eta_0
 # eta_0 = t_q*c / (4*pi**2 * r**3 * b * N_a)
-r = d_i/2
+r_i = d_i/2
 N_a = omega/60
+r_o = r_i + c
 
-eta_0 = t_q*c / (4* pi **2 * r**3 * b * N_a)
+eta_0 = t_q*c / (4* pi **2 * r_i**2 * r_o * b * N_a)
 
 print(f"The lubricant viscocity is: {eta_0:.3f} N.s/m^2")
 
@@ -31,11 +32,11 @@ print(f"The lubricant viscocity is: {eta_0:.3f} N.s/m^2")
 
 # assuming linear flow profile
 A = b * c   # [m^2] - cross-sectional area of the barrel
-v = 2 * pi * N_a * r # [m/s] - velocity of the lubricant
+v = 2 * pi * N_a * r_o # [m/s] - velocity of the lubricant
 Q = 1/2 * A * v # [m^3/s] - flow rate of the lubricant
 m_dot = rho * Q # [kg/s] - mass flow rate of the lubricant
 
-print(f"The flow rate in the viscometer is: {Q:.3f} m^3/s")
+print(f"The flow rate in the viscometer is: {Q:.6f} m^3/s")
 
 # 3 - Frictional heat rate
 Q_dot = t_q * N_a * 2 * pi # [W] - frictional heat rate
@@ -44,7 +45,7 @@ print(f"The frictional heat rate is: {Q_dot:.3f} W")
 
 # 4 - Temperature rise of the lubricant 
 
-m = A * 2 * pi * r * rho # [kg] - mass of the lubricant
+m = A * 2 * pi * r_i * rho # [kg] - mass of the lubricant
 delta_t = c_p * m * delta_T / Q_dot # [s] - time taken for the temperature rise
 
 print(f"The time taken for the temperature rise is: {delta_t:.3f} s")
