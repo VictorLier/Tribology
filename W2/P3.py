@@ -1,34 +1,45 @@
 
 # Problem 3
 
-import math
-import matplotlib.pyplot as plt
 import numpy as np
-from math import log
+import matplotlib.pyplot as plt
 
-# variables
+# Example data
+T = np.array([27, 37.6, 49.0, 60.7, 76.4]) + 273  # Temperature in Kelvin
+v = np.array([53.7, 31.4, 21.4, 13.9, 9.05])        # Kinematic viscosity in cSt
 
-T = np.array([27, 37.6, 49.0, 60.7, 76.4])+np.ones(5)*273.25 # [K] - temperature
-nu = np.array([53.7, 31.4, 21.4, 13.9, 9.05]) # [cSt] - kinematic viscosity
+# Plot using log(T) and log(log(v))
+plt.figure(1)
+plt.clf()
 
-# 1 - plot the data
+plt.plot(np.log(T), np.log(np.log(v)), '-o')
+plt.grid(True)
 
-# Make double logarithmic on y axis
-yticks = [np.exp(np.exp(i)) for i in range(0, 2)]
-xticks = [np.exp(i) for i in range(6, 7)]
+# Make y-axis
+labels = np.array([5, 10, 15, 20, 30, 100, 200])
+Ytick = np.log(np.log(labels))
+plt.gca().set_yticks(Ytick)
+plt.gca().set_yticklabels(labels)
 
-plt.plot(T, nu, 'o-')
-plt.yticks(yticks)
-plt.xticks(xticks)
-plt.xlabel('Temperature [degree celcius]')
-plt.ylabel('Kinematic viscosity [cSt]')
-plt.title('Temperature vs Kinematic viscosity')
-plt.grid()
+# Make x-axis
+xlabels = np.arange(-20, 101, 10) + 273  # Temperature labels from -20 to 100 with a step of 10
+Xtick = np.log(xlabels)
+plt.gca().set_xticks(Xtick)
+plt.gca().set_xticklabels(xlabels)
+
+# Set range of axis
+plt.axis([np.log(293), np.log(353), np.log(np.log(8)), np.log(np.log(100))])
+
+# Labels
+plt.xlabel('Temperature [K]')
+plt.ylabel('Kinematic viscosity [cSt = mm^2/s]')
+
+# Show the plot
 plt.show()
 
 # 2 - fit the data
 
-modify_nu = np.log(np.log(nu+0.8))
+modify_nu = np.log(np.log(v+0.8))
 modify_T = np.log(T)
 a=np.polyfit(modify_T, modify_nu, 1)
 m = a[0]
@@ -36,8 +47,8 @@ C = a[1]
 
 print(f"Following the ASTM walther relation, the constants are: m = {m:.3f} and C = {C:.3f}")
 print("-----")
-m_simple = (np.log(np.log(nu[4]+0.8)) - np.log(np.log(nu[0]+0.8)))/(np.log(T[4])-np.log(T[0]))
-C_simple = np.log(np.log(nu[0]+0.8)) - m_simple*np.log(T[0])
+m_simple = (np.log(np.log(v[4]+0.8)) - np.log(np.log(v[0]+0.8)))/(np.log(T[4])-np.log(T[0]))
+C_simple = np.log(np.log(v[0]+0.8)) - m_simple*np.log(T[0])
 print(f"Following the simple relation, the constants are: m = {m_simple:.3f} and C = {C_simple:.3f}")
 
 # 3 - how much should the temperature increase to halft the kinematic viscosity
