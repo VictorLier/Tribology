@@ -17,16 +17,16 @@ p_i = 0
 p_o = 0
 
 # solving the differential equation
-
 SOL1 = sp.dsolve(eq1, p, ics={p.subs(x, r_i): p_i, p.subs(x, r_o): p_o})
 
 print(sp.simplify(SOL1))
 
-# # defining the variables
+# defining the variables
 r_i_val = 95e-3
 r_o_val = (250e-3)/2
 h_val = 50e-6
 eta_val = 0.1
 rho_0_val = 860
 # w_z_val = 96000.0
+
 
