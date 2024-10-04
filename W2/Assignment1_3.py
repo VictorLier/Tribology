@@ -32,8 +32,8 @@ v_2 = np.array([nu_40_2, nu_100_2])        # Kinematic viscosity in cSt
 # Plot using log(T) and log(log(v))
 plt.figure(1)
 plt.clf()
-# plt.plot(np.log(T_1), np.log(np.log(v_1)), '-o', label="Harmony® AW Hydraulic Oil")
-# plt.plot(np.log(T_2), np.log(np.log(v_2)), '-o', label="Harmony® R&O Oil")
+plt.plot(np.log(T_1), np.log(np.log(v_1)), '-o', label="Harmony® AW Hydraulic Oil")
+plt.plot(np.log(T_2), np.log(np.log(v_2)), '-o', label="Harmony® R&O Oil")
 plt.grid(True)
 labels = np.array([5, 10, 32, 100, 500, 1200])
 Ytick = np.log(np.log(labels))
@@ -73,6 +73,9 @@ print(f"Following the simple relation, the constants for PureBlu Hydraulic Oil a
 T_line = np.linspace(273.15-10, 273.15+100, 100)
 plt.plot(np.log(T_line), m_simple_1*np.log(T_line) + C_simple_1, '--', label="Capella® WF 32 - ASTM Walther - VI = 7")
 plt.plot(np.log(T_line), m_simple_2*np.log(T_line) + C_simple_2, '--', label="PureBlu Hydraulic Oil - ASTM Walther - VI = 100")
+# plt.plot(np.log(T_line), np.log(np.log(np.exp(m_simple_1*np.log(T_line) + C_simple_1) - 0.8)))
+# plt.plot(np.log(T_line), np.log(np.log(np.exp(m_simple_2*np.log(T_line) + C_simple_2) - 0.8))
+
 plt.legend()
 plt.show()
 
@@ -82,5 +85,8 @@ v_1 = np.exp(np.exp(m_simple_1*np.log(T) + C_simple_1))
 v_2 = np.exp(np.exp(m_simple_2*np.log(T) + C_simple_2))
 print(f"Capella® WF 32 - viscosity range: {v_1}")
 print(f"PureBlu Hydraulic Oil - viscosity range: {v_2}")
+
+
+# CHECK LOGLOG I PLOT OG SAMMENLIGN MED MATLAB
 
 
