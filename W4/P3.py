@@ -3,13 +3,20 @@ import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
 
-def finite(n): 
-    # Define the parameters
-    u_b = 10
-    h_0 = 60e-6
-    l = 0.1
-    eta_0 = 0.1
+def finite(n, u_b: float = 10, h_0: float = 60e-6, l: float = 0.1, eta_0: float = 0.1):
+    '''
+    Uses 1D finite difference to solve the Reynolds equation for a thrust bearing with exponential profile
+    
+    returns x, p where x is the grid and p is the pressure
+    
+    u_b: float, the velocity of the bearing [m/s]
 
+    h_0: float, the minimum height of the bearing [m]
+
+    l: float, the length of the bearing [m]
+
+    eta_0: float, the absolute viscosity of the oil at p = 0 [Pa s]
+    '''
     s_h = h_0/(np.exp(-1))- h_0
 
     # Define the grid
@@ -59,43 +66,44 @@ def finite(n):
     return x, p
 
 
-# Plot the solution
-N = 2**np.arange(17)+2
+if __name__ == '__main__':
+    # Plot the solution
+    N = 2**np.arange(17)+2
 
-x = []
-p = []
+    x = []
+    p = []
 
-for i in range(len(N)):
-    X, P = finite(N[i])
-    x.append(X)
-    p.append(P)
-
-
-plt.figure()
-for i in range(len(N)):
-    plt.plot(x[i], p[i], label='N = %d' % N[i])
-plt.legend()
-plt.xlabel('x')
-plt.ylabel('p')
-plt.title('Finite difference solution')
-plt.grid()
-plt.show()
+    for i in range(len(N)):
+        X, P = finite(N[i])
+        x.append(X)
+        p.append(P)
 
 
-# Calculate the error
-baseline = 450668.4416
-error = []
+    plt.figure()
+    for i in range(len(N)):
+        plt.plot(x[i], p[i], label='N = %d' % N[i])
+    plt.legend()
+    plt.xlabel('x')
+    plt.ylabel('p')
+    plt.title('Finite difference solution')
+    plt.grid()
+    plt.show()
 
-for i in range(len(N)):
-    error.append(abs(np.trapezoid(p[i], x[i]) - baseline))
 
-plt.figure()
-for i in range(len(N)):
-    plt.loglog(N, error, label='N = %d' % N[i])
-plt.legend()
-plt.xlabel('N')
-plt.ylabel('Error')
-plt.title('Error')
-plt.grid()
-plt.show()
+    # Calculate the error
+    baseline = 450668.4416
+    error = []
+
+    for i in range(len(N)):
+        error.append(abs(np.trapezoid(p[i], x[i]) - baseline))
+
+    plt.figure()
+    for i in range(len(N)):
+        plt.loglog(N, error, label='N = %d' % N[i])
+    plt.legend()
+    plt.xlabel('N')
+    plt.ylabel('Error')
+    plt.title('Error')
+    plt.grid()
+    plt.show()
 
