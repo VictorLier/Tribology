@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.sparse as sps
+from P3 import finite
+
 
 class AS6:
-    def __init__(self, number_pads: int = 20, type: int = 0, notch_size: float = 0.1, outer_radius: float = 0.250, inner_radius: float = 0.095 , max_load: float = 10e5, absolute_viscosity: float = 32, minimum_height: float = 60e-6, density: float = 900, specific_heat: float = 2000) -> None:
+    def __init__(self, number_pads: int = 20, type: int = 0, notch_size: float = 0.1, outer_radius: float = 0.250, inner_radius: float = 0.095 , max_load: float = 10e5, kinematic_viscosity: float = 32e-6, minimum_height: float = 60e-6, density: float = 860, specific_heat: float = 2000, running_speed: float = 1000) -> None:
         '''
         number_pads (int): number of pads of the bearing
 
@@ -16,13 +19,15 @@ class AS6:
 
         max_load (float): The maximum load of the bearing [N]
 
-        absolute_viscosity (float): The dynamic viscosity of the oil at p = 0 [Pa s]
+        kinematic_viscosity (float): The kinematic viscosity of the oil at p = 0 [m^2/s]
 
         minimum_height (float): The minimum height of the bearing [m]
 
         density (float): The density of the oil [kg/m^3]
 
         specific_heat (float): The specific heat of the oil [J/kg K]
+
+        running_speed (float): The running speed of the bearing [rpm]
         '''
         if type != 0 and type != 1:
             raise ValueError('Type must be 0 or 1')
@@ -35,11 +40,14 @@ class AS6:
         self.r_i = inner_radius
         self.r_m = (self.r_o + self.r_i) / 2
         self.max_load = max_load
-        self.eta_0 = absolute_viscosity
+        self.nu = kinematic_viscosity
         self.h_0 = minimum_height
         self.rho_0 = density
+        self.eta_0 = self.nu * self.rho_0
         self.Cp = specific_heat
+        self.rpm = running_speed
         self.calc_length()
+        self.calc_velocity()
 
 
     def calc_length(self) -> None:
@@ -50,7 +58,15 @@ class AS6:
         self.l = 2 * np.pi * self.r_m * pad_angle / 360 # The length of the pad
 
 
-    def gepmetry_parameters(self, plot: bool = False, print_bol: bool = False):
+    def calc_velocity(self) -> None:
+        '''
+        Calculates the velocity of the bearing at the mid point of the pad
+        '''
+        # Er lidt i tvil om ub er korrekt
+        self.u_b = 2 * np.pi * self.r_m * self.rpm / 60
+
+
+    def geometry_parameters(self, plot: bool = False, print_bol: bool = False):
         '''
         Prints and calcualets the expressions the "optimal" geometry parameters of the bearing
 
@@ -132,8 +148,20 @@ class AS6:
         '''
         Calculates the temperature rise
         '''
-        u_b = 10 # Fatter ikke lige hvorfor den er med?? Se side 189
-        self.Dt_m = 2 * u_b * self.l * self.eta_0 / (self.rho_0 * self.Cp * self.s_h**2) * self.H_p/self.Q # (8.13) - Adiabatic temperature rise
+        # u_b = 10 # Fatter ikke lige hvorfor den er med?? Se side 189
+        # Tror måske det bare er hastigheden
+        self.Dt_m = 2 * self.u_b * self.l * self.eta_0 / (self.rho_0 * self.Cp * self.s_h**2) * self.H_p/self.Q # (8.13) - Adiabatic temperature rise
+
+
+    def pressure_distrubution(self) -> None:
+        '''
+        Calculates the pressure distribution
+        '''
+        print("Pressure distribution")
+        # if self.type == 0: # Fixed inclined pads
+
+
+
 
 if __name__ == '__main__':
     if False: # Test
@@ -144,20 +172,20 @@ if __name__ == '__main__':
     if False: # Part a
         print('Part a')
         inc = AS6(type = 0)
-        inc.gepmetry_parameters(plot = True, print_bol = True)
+        inc.geometry_parameters(plot = True, print_bol = True)
 
         par = AS6(type = 1)
-        par.gepmetry_parameters(plot = True, print_bol = True)
+        par.geometry_parameters(plot = True, print_bol = True)
 
 
     if False: # Part b
         print("Part b:")
         inc = AS6(type = 0)
-        inc.gepmetry_parameters()
+        inc.geometry_parameters()
         inc.friction()
 
         par = AS6(type = 1)
-        par.gepmetry_parameters()
+        par.geometry_parameters()
         par.friction()
 
         if inc.mu < par.mu:
@@ -169,18 +197,40 @@ if __name__ == '__main__':
     if True: # Part c
         print("Part c:")
         inc = AS6(type = 0)
-        inc.gepmetry_parameters()
+        inc.geometry_parameters()
         inc.volume_flow()
         inc.power_loss()
         inc.temp_rise()
 
         par = AS6(type = 1)
-        par.gepmetry_parameters()
+        par.geometry_parameters()
         par.volume_flow()
         par.power_loss()
         par.temp_rise()
 
         print(f"The temperature rise for the fixed inclined pads is: {inc.Dt_m} K")
         print(f"The temperature rise for the parallel-step is: {par.Dt_m} K")
+
+        # Skal lige sammenlignes med Assignment1_3.py for at fine den viscosity ændring
+
+
+    if False: # Part d
+        print("Part d:")
+        inc = AS6(type = 0)
+
+
+
+
+
+        x_fin, p_fin = finite(100, inc.u_b, inc.h_0, inc.l, inc.eta_0)
+
+
+        plt.figure()
+        plt.plot(x_fin, p_fin, label='Finite difference')
+        plt.xlabel('x [m]')
+        plt.ylabel('p [Pa]')
+        plt.title('Pressure distribution')
+        plt.legend()
+        plt.show()
 
 
