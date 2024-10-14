@@ -122,3 +122,6 @@ plt.plot(h_vals, t_vals)
 plt.xlabel('Film thickness (m)')
 plt.ylabel('Time to contact (s)')
 plt.show()
+
+# expoerting data to latex
+np.savetxt('W3/Assignment1_5.txt', np.array([h_vals, t_vals]).T)
