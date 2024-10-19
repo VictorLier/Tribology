@@ -1,17 +1,14 @@
 
 import sympy as sp
+import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 # defining simplified differential equation Eq. 7.46
 
-# defining the symbols
 x, eta, rho, w_a, r_i, r_o, h = sp.symbols('x eta rho w_a r_i r_o h')
-
-# defining the function p(x)
 p = sp.Function('p')(x)
-
-# defining the differential equation
-eq1 = sp.diff(rho*h**3/(12*eta)*sp.diff(p, x), x) - rho*w_a
+eq1 = sp.diff(rho*h**3/(12*eta)*sp.diff(p, x), x) - rho*w_a # defining the differential equation
 
 # defining the boundary conditions
 p_i = 0
@@ -29,51 +26,47 @@ h0_val = 50e-6
 eta_val = 0.1
 rho_0_val = 860
 w_a_val = -0.1
-W_z_val = 10e5
-# make a plot of the pressure distribution, using the given values of the variables
-# but for different film thicknesses; h = {h0, h0/2, h0/4, h0/8}
-import matplotlib.pyplot as plt
+W_z_val = 4e5
 
-# defining the values of the film thickness
 h_vals = [h0_val, h0_val/2, h0_val/4, h0_val/8]
-
-# defining the values of w_a
 w_a_vals = [-0.1, -0.05, -0.01, -0.005]
-
-# defining the range for x
 x_vals = np.linspace(r_i_val, r_o_val, 100)
 
+# Create directory if it does not exist
+output_dir = 'W3'
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
 # plotting the pressure distribution for different film thicknesses and w_a values
-# for w_a_val in w_a_vals:
-#     plt.figure()
-#     for h_val in h_vals:
-#         p_expr = SOL1.rhs.subs({eta: eta_val, w_a: w_a_val, r_i: r_i_val, r_o: r_o_val, h: h_val})
-#         p_vals = [p_expr.subs(x, x_val).evalf() for x_val in x_vals]
-#         plt.plot(x_vals, p_vals, label=f'h = {h_val:.2e} m')
-    
-#     plt.xlabel('x (m)')
-#     plt.ylabel('Pressure distribution (Pa)')
-#     plt.title(f'Pressure distribution vs x for w_a = {w_a_val:.2e} m/s^2')
-#     plt.legend()
-#     plt.show()
+plt.figure()
+for w_a_val in w_a_vals:
+    for h_val in h_vals:
+        p_expr = SOL1.rhs.subs({eta: eta_val, w_a: w_a_val, r_i: r_i_val, r_o: r_o_val, h: h_val})
+        p_vals = [p_expr.subs(x, x_val).evalf() for x_val in x_vals]
+        filename = os.path.join(output_dir, f'1_5_wa_{w_a_val:.2e}_h_{h_val:.2e}.txt')
+        np.savetxt(filename, np.array([x_vals, p_vals]).T)
+        plt.plot(x_vals, p_vals, label=f'h = {h_val:.2e} m')
+
+    plt.xlabel('x (m)')
+    plt.ylabel('Pressure distribution (Pa)')
+    plt.title(f'Pressure distribution vs x for w_a = {w_a_val:.2e} m/s^2')
+    plt.legend()
+    plt.show()
 
 
 # Derive an expression for the flow rate and sketch the  flow profile at ri, ro and the point of maximum pressure.
 
 # ask if it should be made by hand
-# EQ 7.28
-# EQ 7.36
-
 r_mean_val = (r_i_val + r_o_val)/2
 z = sp.symbols('z')
 u = sp.Function('u')(x,z)
-
 p = sp.simplify(SOL1.rhs)
 u = sp.simplify(-z*((h-z)/(2*eta))*sp.diff(p, x))
+print(f"The velocity profile is given by: {u}")
 q_mark = sp.integrate(u, (z, 0, h))
-
 print("Flow rate")
 print(q_mark)
+
 
 # point of maximum pressure by differentiating with respect to x and setting to zero
 p_diff = sp.diff(p, x)
@@ -107,7 +100,6 @@ print(float(w_a.subs(h, h0_val).evalf()))
 t = h/w_a
 print("Time it takes for the bearing surfaces to get into contact at this speed")
 print(float(t.subs({h: h0_val}).evalf()))
-
 
 print(-t.subs({h: h0_val, w_a: w_a.subs({eta: eta_val, r_i: r_i_val, r_o: r_o_val})}))
 print(-t.subs({h: h0_val/2, w_a: w_a.subs({eta: eta_val, r_i: r_i_val, r_o: r_o_val})}))

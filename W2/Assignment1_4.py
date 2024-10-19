@@ -51,7 +51,7 @@ a=np.polyfit(modify_T, modify_nu, 1)
 m_coeff = a[0]
 C_coeff = a[1]
 
-step = 100
+step = 10000
 
 # Define the time
 time = np.linspace(0, 1, step)
