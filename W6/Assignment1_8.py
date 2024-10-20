@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 class AS8:
-    def __init__(self, outer_radius: float = 0.125, film_thickness: float = 10e-6, kinematic_viscosity: float = 32e-6, density: float = 860, running_speed: float = 1000, load: float = 100000) -> None:
+    def __init__(self, outer_radius: float = 0.125, film_thickness: float = 10e-6, kinematic_viscosity: float = 32e-6, density: float = 860, running_speed: float = 1000, load: float = 4e5) -> None:
         '''
         outer_radius (float): The outer radius of the bearing [m]
         
@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
         # Vi kan lige lave et plot
 
-        film_tykkelse = np.linspace(5e-6, 5e-4, 100)
+        film_tykkelse = np.linspace(1e-6, 150e-6, 100)
         
         bearings = np.zeros(len(film_tykkelse), dtype=object)
 
@@ -110,11 +110,23 @@ if __name__ == '__main__':
             viscPower[i] = bearing.H_v
             pumpPower[i] = bearing.H_p
 
+        # Convering units
+        film_tykkelse = film_tykkelse * 1e6
+        totalPower = totalPower / 1e3
+        viscPower = viscPower / 1e3
+        pumpPower = pumpPower / 1e3
+
         plt.figure()
         plt.plot(film_tykkelse, totalPower, 'r', label="Total")
         plt.plot(film_tykkelse, viscPower, 'b', label="Viscous")
         plt.plot(film_tykkelse, pumpPower, 'g', label="Pumping")
+        plt.axis([0, 150, 0, 20])
         plt.legend()
-        plt.xlabel('Film thickness [m]')
-        plt.ylabel('Power [W]')
+        plt.xlabel('Film thickness [$\mu $m]')
+        plt.ylabel('Power [kW]')
+        plt.grid(True)
         plt.show()
+
+        print(min(totalPower))
+        # print film thickness for minimum power
+        print(film_tykkelse[np.argmin(totalPower)])
