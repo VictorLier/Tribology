@@ -20,13 +20,13 @@ SOL1 = sp.dsolve(eq1, p, ics={p.subs(x, r_i): p_i, p.subs(x, r_o): p_o})
 print(sp.simplify(SOL1.rhs))
 
 # defining the variables
-r_i_val = 95e-3
-r_o_val = (250e-3)/2
-h0_val = 50e-6
-eta_val = 0.1
-rho_0_val = 860
-w_a_val = -0.1
-W_z_val = 4e5
+r_i_val = 95e-3         # inner radius
+r_o_val = (250e-3)/2    # outer radius
+h0_val = 50e-6          # film thickness
+rho_0_val = 850          # density
+eta_val = 32e-6 * rho_0_val # dynamic viscosity
+w_a_val = -0.1          # velocity
+W_z_val = 4e5           # load capacity
 
 h_vals = [h0_val, h0_val/2, h0_val/4, h0_val/8]
 w_a_vals = [-0.1, -0.05, -0.01, -0.005]
@@ -74,7 +74,7 @@ p_max = sp.solve(p_diff, x)
 print("Point of maximum pressure")
 print(p_max)
 print("maximum pressure")
-print((p.subs(x, p_max[0])).subs({eta: eta_val, r_i: r_i_val, r_o: r_o_val, h: h0_val}))
+print((p.subs(x, p_max[0])).subs({eta: eta_val, r_i: r_i_val, r_o: r_o_val, h: h0_val, w_a: w_a_val}).evalf())
 print(sp.simplify(p.subs(x, r_i/2 + r_o/2)))
 
 print("load capacity per unit width")
@@ -108,12 +108,14 @@ print(-t.subs({h: h0_val/8, w_a: w_a.subs({eta: eta_val, r_i: r_i_val, r_o: r_o_
 
 # Plot the time it takes for the bearing surfaces to get into contact as a function of the film thickness.
 h_vals = np.linspace(h0_val, h0_val/8, 100)
-t_vals = [-t.subs({h: h_val, w_a: w_a.subs({eta: eta_val, r_i: r_i_val, r_o: r_o_val})}) for h_val in h_vals]   
+t_vals = [-t.subs({h: h_val, w_a: w_a.subs({eta: eta_val, r_i: r_i_val, r_o: r_o_val})}) for h_val in h_vals]
+h_vals_micro = [h_val*1e6 for h_val in h_vals]
+t_vals_mili = [t_val*1e3 for t_val in t_vals]   
 plt.figure()
-plt.plot(h_vals, t_vals)
-plt.xlabel('Film thickness (m)')
-plt.ylabel('Time to contact (s)')
+plt.plot(h_vals_micro, t_vals_mili)
+plt.xlabel('Film thickness (µm)')
+plt.ylabel('Time (ms)')
 plt.show()
 
 # expoerting data to latex
-np.savetxt('W3/Assignment1_5.txt', np.array([h_vals, t_vals]).T)
+np.savetxt('W3/Assignment1_5.txt', np.array([h_vals_micro, t_vals_mili]).T)
