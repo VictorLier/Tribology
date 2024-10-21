@@ -32,7 +32,12 @@ class AS8:
 
         print_bi (bool): If True, the function will print the results
         '''
-        self.r_i = self.r_o * 0.53 # p.327
+        # self.r_i = self.r_o * 0.53 # p.327
+
+
+        self.r_i = self.r_o * 0.53
+
+
         self.Delta = 10 * self.h_0 # p.323
 
 
