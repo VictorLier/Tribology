@@ -95,3 +95,6 @@ plt.xlabel('Time [s]')
 plt.ylabel('Kinematic Viscosity [m^2/s]')
 plt.title('Kinematic Viscosity vs Time')
 plt.show()
+
+np.savetxt(f'W2/data/power.txt', np.array([time[1:], Power[1:]]).T)
+np.savetxt(f'W2/data/temperature.txt', np.array([time[1:], Temperature[1:]]).T)
