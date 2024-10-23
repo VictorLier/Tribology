@@ -217,8 +217,10 @@ class AS6:
 
         # Calculate the load capacity
         self.F = np.trapezoid(self.p, self.x) 
+        self.F = self.F * self.b
         if printbol:
-            print(f"The load capacity is: {self.F:.3g} N")
+            print(f"The load capacity is: {self.F:.4g} N")
+            print(f"The total load capacity is: {self.F*self.number_pads:.4g} N")
 
 
         if plot:
@@ -286,7 +288,7 @@ if __name__ == '__main__':
         # Skal lige sammenlignes med Assignment1_3.py for at fine den viscosity ændring
 
 
-    if False: # Part d
+    if True: # Part d
         print("Part d:")
         inc = AS6(type = 0)
         inc.geometry_parameters(plot=False)
@@ -298,7 +300,7 @@ if __name__ == '__main__':
         par.pressure_distrubution(plot = True, printbol=True)
         print(par.wm_z)
 
-    if True: # Part e
+    if False: # Part e
         print("Part e:")
         loads = np.linspace(1e5, 10e5, 100)
         film_thickness_0 = np.zeros(len(loads))
