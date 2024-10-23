@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.sparse as sps
-from P3 import finite
 
 
 class AS6:
@@ -81,24 +80,24 @@ class AS6:
         plot (bool): If True, plots the shoulder height
         '''
         if self.type == 0: # Fixed inclined pads
-            x = np.linspace(0, self.l, 2)
+            self.x = np.linspace(0, self.l, 100)
             self.H_0 = np.sqrt(2)/2 # 8.28
             self.W_z = 6*np.log((self.H_0 + 1)/self.H_0) - 12/(1+2*self.H_0) #8.30
             self.s_h = np.sqrt(self.wm_z * self.W_z * self.eta_0 * self.u_b) * self.l / self.wm_z
             self.h_0 = self.s_h * self.H_0
-            h = self.h_0 + self.s_h * (1 - x/self.l)
+            self.h = self.h_0 + self.s_h * (1 - self.x/self.l)
             if print_bol:
                 print(f"Fixed inclined pads: The optimal being: s_h = {self.s_h:.3g} and h_0 = {self.h_0:.3g}")
             if plot:
                 plt.figure()
-                plt.plot(x, h)
+                plt.plot(self.x, self.h)
                 plt.xlabel('x [m]')
                 plt.ylabel('h [m]')
-                plt.ylim(0, np.max(h)*1.1)
+                plt.ylim(0, np.max(self.h)*1.1)
                 plt.title('Shoulder height - Fixed inclined pads')
                 plt.show()
 
-                np.savetxt('W4/data/fixedProfile.txt', np.array([x, h]).T)
+                np.savetxt('W4/data/fixedProfile.txt', np.array([self.x, self.h]).T)
 
         if self.type == 1: # Parallel-step
             self.n_s = 0.7182
@@ -107,20 +106,28 @@ class AS6:
             self.s_h = np.sqrt(self.wm_z*self.W_z*self.eta_0*self.u_b)*self.l / self.wm_z
             self.h_0 = self.s_h * self.H_0
 
-            x = np.array([0, self.l*self.n_s, self.l*self.n_s, self.l])
-            h = np.array([self.h_0+self.s_h, self.h_0+self.s_h, self.h_0, self.h_0])
+
+            self.x = np.linspace(0, self.l, 1000)
+            self.h = np.ones(len(self.x)) * self.h_0
+            index = int(self.n_s * len(self.x))
+            self.h[:index] = self.h_0 + self.s_h
+            
+            
+            # self.x = np.array([0, self.n_s*self.l, self.n_s*self.l, self.l])
+            # self.h = np.array([self.h_0+self.s_h, self.h_0+self.s_h, self.h_0, self.h_0])
             if print_bol:
                 print(f"Parallel-step: h_0 = {self.h_0:.3g} and s_h = {self.s_h:.3g}")
             if plot:
                 plt.figure()
-                plt.plot(x, h)
+                plt.plot(self.x, self.h)
                 plt.xlabel('x [m]')
                 plt.ylabel('h [m]')
-                plt.ylim(0, np.max(h)*1.1)
+                plt.ylim(0, np.max(self.h)*1.1)
                 plt.title('Shoulder height - Parallel-step')
                 plt.show()
 
-                np.savetxt('W4/data/parallelProfile.txt', np.array([x, h]).T)
+                np.savetxt('W4/data/parallelProfile.txt', np.array([self.x, self.h]).T)
+
 
     def friction(self):
         '''
@@ -144,7 +151,7 @@ class AS6:
             self.Q = 2 * self.H_0 * (1 + self.H_0) / (1 + 2* self.H_0) # (8.36)
         
         if self.type == 1:
-            self.Q = - self.P_m * (self.H_0 + 1)**3 / (6 * self.n_s) + self.H_0 + 1
+            self.Q = - self.P_m * (self.H_0 + 1)**3 / (6 * self.n_s) + self.H_0 + 1  # (8.81)
 
 
     def power_loss(self):
@@ -155,7 +162,7 @@ class AS6:
             self.H_p = -4 * np.log(self.H_0 / (self.H_0 + 1)) - 6 / (1 + 2 * self.H_0) # (8.37)
         
         if self.type == 1:
-            F_b = - self.P_m/2 + (self.H_0 + 1 - self.n_s) / (self.H_0 * (1 + self.H_0)) # (8.79
+            F_b = - self.P_m/2 - (self.H_0 + 1 - self.n_s) / (self.H_0 * (1 + self.H_0)) # (8.79)
             self.H_p = - F_b
 
 
@@ -163,18 +170,66 @@ class AS6:
         '''
         Calculates the temperature rise
         '''
-        # u_b = 10 # Fatter ikke lige hvorfor den er med?? Se side 189
-        # Tror måske det bare er hastigheden
         self.Dt_m = 2 * self.u_b * self.l * self.eta_0 / (self.rho_0 * self.Cp * self.s_h**2) * self.H_p/self.Q # (8.13) - Adiabatic temperature rise
 
 
-    def pressure_distrubution(self) -> None:
+    def pressure_distrubution(self, plot = False, printbol = False) -> None:
         '''
-        Calculates the pressure distribution
-        '''
-        print("Pressure distribution")
-        # if self.type == 0: # Fixed inclined pads
+        Calculates the pressure distribution with a finite difference method
 
+        plot (bool): If True, plots the pressure distribution
+
+        printbol (bool): If True, prints the load capacity
+        '''
+        dx = abs(self.x[0] - self.x[1])
+
+        # Create the diagonals
+        north = np.zeros(len(self.h))
+        for i in range(len(self.h)-2):
+            i = i+1
+            north[i+1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1/(2*dx) + self.h[i]**3 * 1/(dx**2)
+        
+        middle = np.zeros(len(self.h))
+        for i in range(len(self.h)):
+            middle[i] = self.h[i]**3 * -2/(dx**2)
+        
+        south = np.zeros(len(self.h))
+        for i in range(len(self.h)-2):
+            i = i+1
+            south[i-1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * -1/(2*dx) + self.h[i]**3 * 1/(dx**2)
+        
+        # Bondary conditions
+        middle[0] = 1
+        middle[-1] = 1
+
+        # Create the matrix
+        data = np.array([north, middle, south])
+        A = sps.spdiags(data, [1, 0, -1], len(self.h), len(self.h), format = 'csr').T
+
+        # rhs
+        rhs = np.zeros(len(self.h))
+        for i in range(len(self.h)-2):
+            i=i+1
+            rhs[i] = 6 * self.eta_0 * self.u_b * (self.h[i+1] - self.h[i-1]) / (2 * dx)
+
+        # Solve the system
+        self.p = sps.linalg.spsolve(A, rhs)
+
+        # Calculate the load capacity
+        self.F = np.trapezoid(self.p, self.x) 
+        if printbol:
+            print(f"The load capacity is: {self.F:.3g} N")
+
+
+        if plot:
+            plt.figure()
+            plt.plot(self.x, self.p)
+            plt.xlabel('x [m]')
+            plt.ylabel('p [Pa]')
+            plt.title('Pressure distribution')
+            plt.show()
+
+            np.savetxt(f'W4/data/pressureDistribution{self.type}.txt', np.array([self.x, self.p]).T)
 
 
 
@@ -193,7 +248,7 @@ if __name__ == '__main__':
         par.geometry_parameters(plot = True, print_bol = True)
 
 
-    if True: # Part b
+    if False: # Part b
         print("Part b:")
         inc = AS6(type = 0)
         inc.geometry_parameters()
@@ -213,12 +268,14 @@ if __name__ == '__main__':
         print("Part c:")
         inc = AS6(type = 0)
         inc.geometry_parameters()
+        inc.friction()
         inc.volume_flow()
         inc.power_loss()
         inc.temp_rise()
 
         par = AS6(type = 1)
         par.geometry_parameters()
+        par.friction()
         par.volume_flow()
         par.power_loss()
         par.temp_rise()
@@ -232,20 +289,62 @@ if __name__ == '__main__':
     if False: # Part d
         print("Part d:")
         inc = AS6(type = 0)
+        inc.geometry_parameters(plot=False)
+        inc.pressure_distrubution(plot = True, printbol=True)
+        print(inc.wm_z)
 
+        par = AS6(type = 1)
+        par.geometry_parameters(plot=False)
+        par.pressure_distrubution(plot = True, printbol=True)
+        print(par.wm_z)
 
-
-
-
-        x_fin, p_fin = finite(100, inc.u_b, inc.h_0, inc.l, inc.eta_0)
-
-
+    if True: # Part e
+        print("Part e:")
+        loads = np.linspace(1e5, 10e5, 100)
+        film_thickness_0 = np.zeros(len(loads))
+        for i, load in enumerate(loads):
+            inc = AS6(max_load = load, type = 0)
+            inc.geometry_parameters()
+            film_thickness_0[i] = inc.h_0
+        
+        film_thickness_1 = np.zeros(len(loads))
+        for i, load in enumerate(loads):
+            par = AS6(max_load = load, type = 1)
+            par.geometry_parameters()
+            film_thickness_1[i] = par.h_0
+        
         plt.figure()
-        plt.plot(x_fin, p_fin, label='Finite difference')
-        plt.xlabel('x [m]')
-        plt.ylabel('p [Pa]')
-        plt.title('Pressure distribution')
+        plt.plot(loads, film_thickness_0, label = 'Fixed inclined pads')
+        plt.plot(loads, film_thickness_1, label = 'Parallel-step')
+        plt.xlabel('Load [N]')
+        plt.ylabel('Film thickness [m]')
+        plt.title('Film thickness vs load')
         plt.legend()
         plt.show()
 
+        np.savetxt('W4/data/filmThickness0.txt', np.array([loads, film_thickness_0]).T)
+        np.savetxt('W4/data/filmThickness1.txt', np.array([loads, film_thickness_1]).T)
 
+        inc_normal = AS6(max_load = 4e5, type = 0)
+        inc_plus = AS6(max_load = 4e5*1.1, type = 0)
+        inc_minus = AS6(max_load = 4e5*0.9, type = 0)
+
+        inc_normal.geometry_parameters()
+        inc_plus.geometry_parameters()
+        inc_minus.geometry_parameters()
+
+        print(f"For the incline pads, the film thickness is: {inc_normal.h_0:.3g} m")
+        print(f"For a 10% increase in load, the film thickness changed by: {inc_plus.h_0-inc_normal.h_0:.3g} m")
+        print(f"For a 10% decrease in load, the film thickness changed by: {inc_minus.h_0-inc_normal.h_0:.3g} m")
+
+        par_normal = AS6(max_load = 4e5, type = 1)
+        par_plus = AS6(max_load = 4e5*1.1, type = 1)
+        par_minus = AS6(max_load = 4e5*0.9, type = 1)
+
+        par_normal.geometry_parameters()
+        par_plus.geometry_parameters()
+        par_minus.geometry_parameters()
+
+        print(f"For the parallel-step, the film thickness is: {par_normal.h_0:.3g} m")
+        print(f"For a 10% increase in load, the film thickness changed by: {par_plus.h_0-par_normal.h_0:.3g} m")
+        print(f"For a 10% decrease in load, the film thickness changed by: {par_minus.h_0-par_normal.h_0:.3g} m")
