@@ -1,11 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.sparse as sps
-from P3 import finite
 
 
 class AS6:
-    def __init__(self, number_pads: int = 20, type: int = 0, notch_size: float = 0.1, outer_radius: float = 0.250, inner_radius: float = 0.095 , max_load: float = 10e5, kinematic_viscosity: float = 32e-6, minimum_height: float = 60e-6, density: float = 860, specific_heat: float = 2000, running_speed: float = 1000) -> None:
+    def __init__(self, number_pads: int = 20, type: int = 0, notch_size: float = 0.1, outer_radius: float = 0.250/2, inner_radius: float = 0.095 , max_load: float = 4e5, kinematic_viscosity: float = 32e-6, minimum_height: float = 60e-6, density: float = 860, specific_heat: float = 2000, running_speed: float = 1000) -> None:
         '''
         number_pads (int): number of pads of the bearing
 
@@ -38,24 +37,25 @@ class AS6:
         self.notch_size = notch_size
         self.r_o = outer_radius
         self.r_i = inner_radius
-        self.r_m = (self.r_o + self.r_i) / 2
+        self.r_m = (self.r_o + self.r_i) / 2    # The mean radius of the bearing
+        self.b = self.r_o - self.r_i            # The width of the bearing
         self.max_load = max_load
         self.nu = kinematic_viscosity
         self.h_0 = minimum_height
         self.rho_0 = density
-        self.eta_0 = self.nu * self.rho_0
+        self.eta_0 = self.nu * self.rho_0       # The dynamic viscosity
         self.Cp = specific_heat
         self.rpm = running_speed
         self.calc_length()
         self.calc_velocity()
+        self.load_per_unit_width()
 
 
     def calc_length(self) -> None:
         '''
         Calculates the length of the pad
         '''
-        pad_angle = 360 / self.number_pads * (1 - self.notch_size) # The angle of the pad
-        self.l = 2 * np.pi * self.r_m * pad_angle / 360 # The length of the pad
+        self.l = 2*np.pi * self.r_m/self.number_pads * (1 - self.notch_size) # The length of the pad
 
 
     def calc_velocity(self) -> None:
@@ -66,6 +66,13 @@ class AS6:
         self.u_b = 2 * np.pi * self.r_m * self.rpm / 60
 
 
+    def load_per_unit_width(self) -> None:
+        '''
+        Calculates the load per unit width
+        '''
+        self.wm_z = self.max_load / self.number_pads / self.b # (8.1)
+
+
     def geometry_parameters(self, plot: bool = False, print_bol: bool = False):
         '''
         Prints and calcualets the expressions the "optimal" geometry parameters of the bearing
@@ -73,39 +80,53 @@ class AS6:
         plot (bool): If True, plots the shoulder height
         '''
         if self.type == 0: # Fixed inclined pads
+            self.x = np.linspace(0, self.l, 100)
+            self.H_0 = np.sqrt(2)/2 # 8.28
+            self.W_z = 6*np.log((self.H_0 + 1)/self.H_0) - 12/(1+2*self.H_0) #8.30
+            self.s_h = np.sqrt(self.wm_z * self.W_z * self.eta_0 * self.u_b) * self.l / self.wm_z
+            self.h_0 = self.s_h * self.H_0
+            self.h = self.h_0 + self.s_h * (1 - self.x/self.l)
             if print_bol:
-                print("Fixed inclined pads: h = h_0 + s_h * (1 - x/l) with the optimal being: s_h = sqrt(2) * h_0") # (8.16) (8.28)
-            x = np.linspace(0, self.l, 100)
-            self.s_h = np.exp(2) * self.h_0
-            self.H_0 = self.h_0 / self.s_h
-            self.P_m = 3 / (2* self.H_0 * (1 + self.H_0) * (1 + 2 * self.H_0)) # (8.26)
-            h = self.h_0 + self.s_h * (1 - x/self.l)
+                print(f"Fixed inclined pads: The optimal being: s_h = {self.s_h:.3g} and h_0 = {self.h_0:.3g}")
             if plot:
                 plt.figure()
-                plt.plot(x, h)
+                plt.plot(self.x, self.h)
                 plt.xlabel('x [m]')
                 plt.ylabel('h [m]')
-                plt.ylim(0, np.max(h)*1.1)
+                plt.ylim(0, np.max(self.h)*1.1)
                 plt.title('Shoulder height - Fixed inclined pads')
                 plt.show()
 
+                np.savetxt('W4/data/fixedProfile.txt', np.array([self.x, self.h]).T)
+
         if self.type == 1: # Parallel-step
-            if print_bol:
-                print("Parallel-step: H_0 = h_0 / s_h = 1.155 and n_s = 0.7182") # (8.68) (8.69)
-            self.s_h = self.h_0 / 1.155
-            self.H_0 = 1.155
             self.n_s = 0.7182
-            self.P_m = 6*self.n_s / ((1-self.n_s) * (self.H_0 + 1)**3 + self.n_s * self.H_0**3) # (8.65)
-            x = np.array([0, self.n_s*self.l, self.n_s*self.l, self.l])
-            h = np.array([self.h_0+self.s_h, self.h_0+self.s_h, self.h_0, self.h_0])
+            self.H_0 = 1.155
+            self.W_z = 3 * self.n_s * (1 - self.n_s) / ( (1 - self.n_s) * (self.H_0 + 1)**3 + self.n_s * self.H_0**3)
+            self.s_h = np.sqrt(self.wm_z*self.W_z*self.eta_0*self.u_b)*self.l / self.wm_z
+            self.h_0 = self.s_h * self.H_0
+
+
+            self.x = np.linspace(0, self.l, 1000)
+            self.h = np.ones(len(self.x)) * self.h_0
+            index = int(self.n_s * len(self.x))
+            self.h[:index] = self.h_0 + self.s_h
+            
+            
+            # self.x = np.array([0, self.n_s*self.l, self.n_s*self.l, self.l])
+            # self.h = np.array([self.h_0+self.s_h, self.h_0+self.s_h, self.h_0, self.h_0])
+            if print_bol:
+                print(f"Parallel-step: h_0 = {self.h_0:.3g} and s_h = {self.s_h:.3g}")
             if plot:
                 plt.figure()
-                plt.plot(x, h)
+                plt.plot(self.x, self.h)
                 plt.xlabel('x [m]')
                 plt.ylabel('h [m]')
-                plt.ylim(0, np.max(h)*1.1)
+                plt.ylim(0, np.max(self.h)*1.1)
                 plt.title('Shoulder height - Parallel-step')
                 plt.show()
+
+                np.savetxt('W4/data/parallelProfile.txt', np.array([self.x, self.h]).T)
 
 
     def friction(self):
@@ -118,6 +139,7 @@ class AS6:
             self.mu = up/ned # (8.34)
         
         if self.type == 1:
+            self.P_m = 6 * self.n_s * (1 - self.n_s) / ( (1 - self.n_s) * (self.H_0 + 1)**3 + self.n_s * self.H_0**3) # (8.65
             self.mu = self.s_h / self.l * (1 + (2 * (self.H_0 + 1 - self.n_s)) / (self.P_m * self.H_0*(1+self.H_0))) # (8.80)
 
 
@@ -129,7 +151,7 @@ class AS6:
             self.Q = 2 * self.H_0 * (1 + self.H_0) / (1 + 2* self.H_0) # (8.36)
         
         if self.type == 1:
-            self.Q = - self.P_m * (self.H_0 + 1)**3 / (6 * self.n_s) + self.H_0 + 1
+            self.Q = - self.P_m * (self.H_0 + 1)**3 / (6 * self.n_s) + self.H_0 + 1  # (8.81)
 
 
     def power_loss(self):
@@ -140,7 +162,7 @@ class AS6:
             self.H_p = -4 * np.log(self.H_0 / (self.H_0 + 1)) - 6 / (1 + 2 * self.H_0) # (8.37)
         
         if self.type == 1:
-            F_b = - self.P_m/2 + (self.H_0 + 1 - self.n_s) / (self.H_0 * (1 + self.H_0)) # (8.79
+            F_b = - self.P_m/2 - (self.H_0 + 1 - self.n_s) / (self.H_0 * (1 + self.H_0)) # (8.79)
             self.H_p = - F_b
 
 
@@ -148,28 +170,119 @@ class AS6:
         '''
         Calculates the temperature rise
         '''
-        # u_b = 10 # Fatter ikke lige hvorfor den er med?? Se side 189
-        # Tror måske det bare er hastigheden
         self.Dt_m = 2 * self.u_b * self.l * self.eta_0 / (self.rho_0 * self.Cp * self.s_h**2) * self.H_p/self.Q # (8.13) - Adiabatic temperature rise
 
 
-    def pressure_distrubution(self) -> None:
+    def pressure_distrubution2(self, plot = False, printbol = False) -> None:
         '''
-        Calculates the pressure distribution
+        Calculates the pressure distribution with a finite difference method
+
+        plot (bool): If True, plots the pressure distribution
+
+        printbol (bool): If True, prints the load capacity
         '''
-        print("Pressure distribution")
-        # if self.type == 0: # Fixed inclined pads
+        dx = abs(self.x[0] - self.x[1])
+
+        # Create the diagonals
+        north = np.zeros(len(self.h))
+        for i in range(len(self.h)-2):
+            i = i+1
+            north[i+1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1/(2*dx) + self.h[i]**3 * 1/(dx**2)
+        
+        middle = np.zeros(len(self.h))
+        for i in range(len(self.h)):
+            middle[i] = self.h[i]**3 * -2/(dx**2)
+        
+        south = np.zeros(len(self.h))
+        for i in range(len(self.h)-2):
+            i = i+1
+            south[i-1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * -1/(2*dx) + self.h[i]**3 * 1/(dx**2)
+        
+        # Bondary conditions
+        middle[0] = 1
+        middle[-1] = 1
+
+        # Create the matrix
+        data = np.array([north, middle, south])
+        A = sps.spdiags(data, [1, 0, -1], len(self.h), len(self.h), format = 'csr').T
+
+        # rhs
+        rhs = np.zeros(len(self.h))
+        for i in range(len(self.h)-2):
+            i=i+1
+            rhs[i] = 6 * self.eta_0 * self.u_b * (self.h[i+1] - self.h[i-1]) / (2 * dx)
+
+        # Solve the system
+        self.p = sps.linalg.spsolve(A, rhs)
+
+        # Calculate the load capacity
+        self.F = np.trapezoid(self.p, self.x) 
+        self.F = self.F * self.b
+        if printbol:
+            print(f"The load capacity is: {self.F:.4g} N")
+            print(f"The total load capacity is: {self.F*self.number_pads:.4g} N")
 
 
+        if plot:
+            plt.figure()
+            plt.plot(self.x, self.p)
+            plt.xlabel('x [m]')
+            plt.ylabel('p [Pa]')
+            plt.title('Pressure distribution')
+            plt.show()
 
+            np.savetxt(f'W4/data/pressureDistribution{self.type}.txt', np.array([self.x, self.p]).T)
+
+
+    def pressure_distrubution(self, plot = False, printbol = False) -> None:
+        '''
+        Calculates the pressure distribution with a finite difference method
+
+        plot (bool): If True, plots the pressure distribution
+
+        printbol (bool): If True, prints the load capacity
+        '''
+        dx = abs(self.x[0] - self.x[1])
+
+        rhs = np.zeros(len(self.h))
+        A = sps.eye(len(self.h))
+        A = A.tocsr()
+
+        for i in range(1, len(self.h)-1):
+            A[i, i-1] = -3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1 / (2 * dx) + self.h[i]**3 * 1 / (dx**2)
+            A[i, i] = self.h[i]**3 * (-2) / (dx**2)
+            A[i, i+1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1 / (2 * dx) + self.h[i]**3 * 1 / (dx**2)
+    
+            rhs[i] = 6 * self.u_b * self.eta_0 * (self.h[i+1] - self.h[i-1]) / (2 * dx)
+
+        # Solve the system
+        self.p = sps.linalg.spsolve(A, rhs)
+
+        # Calculate the load capacity
+        self.F = np.trapezoid(self.p, self.x) 
+        self.F = self.F * self.b
+        if printbol:
+            print(f"The load capacity is: {self.F:.4g} N")
+            print(f"The total load capacity is: {self.F*self.number_pads:.4g} N")
+
+
+        if plot:
+            plt.figure()
+            plt.plot(self.x, self.p)
+            plt.xlabel('x [m]')
+            plt.ylabel('p [Pa]')
+            plt.title('Pressure distribution')
+            plt.show()
+
+            np.savetxt(f'W4/data/pressureDistribution{self.type}.txt', np.array([self.x, self.p]).T)
 
 if __name__ == '__main__':
-    if False: # Test
+    if True: # Test
         print("Test")
         test = AS6()
 
 
-    if False: # Part a
+    if True: # Part a
         print('Part a')
         inc = AS6(type = 0)
         inc.geometry_parameters(plot = True, print_bol = True)
@@ -178,7 +291,7 @@ if __name__ == '__main__':
         par.geometry_parameters(plot = True, print_bol = True)
 
 
-    if False: # Part b
+    if True: # Part b
         print("Part b:")
         inc = AS6(type = 0)
         inc.geometry_parameters()
@@ -189,21 +302,23 @@ if __name__ == '__main__':
         par.friction()
 
         if inc.mu < par.mu:
-            print(f"The friction coefficient for the fixed inclined pads is lower than the parallel-step: {inc.mu:.4f} < {par.mu:.4f}")
+            print(f"The friction coefficient for the fixed inclined pads is lower than the parallel-step: {inc.mu:.4g} < {par.mu:.4g}")
         else:
-            print(f"The friction coefficient for the parallel-step is lower than the fixed inclined pads: {par.mu:.4f} < {inc.mu:.4f}")
+            print(f"The friction coefficient for the parallel-step is lower than the fixed inclined pads: {par.mu:.4g} < {inc.mu:.4g}")
 
 
     if True: # Part c
         print("Part c:")
         inc = AS6(type = 0)
         inc.geometry_parameters()
+        inc.friction()
         inc.volume_flow()
         inc.power_loss()
         inc.temp_rise()
 
         par = AS6(type = 1)
         par.geometry_parameters()
+        par.friction()
         par.volume_flow()
         par.power_loss()
         par.temp_rise()
@@ -214,23 +329,65 @@ if __name__ == '__main__':
         # Skal lige sammenlignes med Assignment1_3.py for at fine den viscosity ændring
 
 
-    if False: # Part d
+    if True: # Part d
         print("Part d:")
         inc = AS6(type = 0)
+        inc.geometry_parameters(plot=False)
+        inc.pressure_distrubution(plot = True, printbol=True)
+        print(inc.wm_z)
 
+        par = AS6(type = 1)
+        par.geometry_parameters(plot=False)
+        par.pressure_distrubution(plot = True, printbol=True)
+        print(par.wm_z)
 
-
-
-
-        x_fin, p_fin = finite(100, inc.u_b, inc.h_0, inc.l, inc.eta_0)
-
-
+    if True: # Part e
+        print("Part e:")
+        loads = np.linspace(1e5, 10e5, 100)
+        film_thickness_0 = np.zeros(len(loads))
+        for i, load in enumerate(loads):
+            inc = AS6(max_load = load, type = 0)
+            inc.geometry_parameters()
+            film_thickness_0[i] = inc.h_0
+        
+        film_thickness_1 = np.zeros(len(loads))
+        for i, load in enumerate(loads):
+            par = AS6(max_load = load, type = 1)
+            par.geometry_parameters()
+            film_thickness_1[i] = par.h_0
+        
         plt.figure()
-        plt.plot(x_fin, p_fin, label='Finite difference')
-        plt.xlabel('x [m]')
-        plt.ylabel('p [Pa]')
-        plt.title('Pressure distribution')
+        plt.plot(loads, film_thickness_0, label = 'Fixed inclined pads')
+        plt.plot(loads, film_thickness_1, label = 'Parallel-step')
+        plt.xlabel('Load [N]')
+        plt.ylabel('Film thickness [m]')
+        plt.title('Film thickness vs load')
         plt.legend()
         plt.show()
 
+        np.savetxt('W4/data/filmThickness0.txt', np.array([loads, film_thickness_0]).T)
+        np.savetxt('W4/data/filmThickness1.txt', np.array([loads, film_thickness_1]).T)
 
+        inc_normal = AS6(max_load = 4e5, type = 0)
+        inc_plus = AS6(max_load = 4e5*1.1, type = 0)
+        inc_minus = AS6(max_load = 4e5*0.9, type = 0)
+
+        inc_normal.geometry_parameters()
+        inc_plus.geometry_parameters()
+        inc_minus.geometry_parameters()
+
+        print(f"For the incline pads, the film thickness is: {inc_normal.h_0:.3g} m")
+        print(f"For a 10% increase in load, the film thickness changed by: {inc_plus.h_0-inc_normal.h_0:.3g} m")
+        print(f"For a 10% decrease in load, the film thickness changed by: {inc_minus.h_0-inc_normal.h_0:.3g} m")
+
+        par_normal = AS6(max_load = 4e5, type = 1)
+        par_plus = AS6(max_load = 4e5*1.1, type = 1)
+        par_minus = AS6(max_load = 4e5*0.9, type = 1)
+
+        par_normal.geometry_parameters()
+        par_plus.geometry_parameters()
+        par_minus.geometry_parameters()
+
+        print(f"For the parallel-step, the film thickness is: {par_normal.h_0:.3g} m")
+        print(f"For a 10% increase in load, the film thickness changed by: {par_plus.h_0-par_normal.h_0:.3g} m")
+        print(f"For a 10% decrease in load, the film thickness changed by: {par_minus.h_0-par_normal.h_0:.3g} m")
