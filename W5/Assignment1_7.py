@@ -141,34 +141,16 @@ class AS7:
         '''
         dx = abs(self.x[0] - self.x[1])
 
-        # Create the diagonals
-        north = np.zeros(len(self.h))
-        for i in range(len(self.h)-2):
-            i = i+1
-            north[i+1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1/(2*dx) + self.h[i]**3 * 1/(dx**2)
-        
-        middle = np.zeros(len(self.h))
-        for i in range(len(self.h)):
-            middle[i] = self.h[i]**3 * -2/(dx**2)
-        
-        south = np.zeros(len(self.h))
-        for i in range(len(self.h)-2):
-            i = i+1
-            south[i-1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * -1/(2*dx) + self.h[i]**3 * 1/(dx**2)
-        
-        # Bondary conditions
-        middle[0] = 1
-        middle[-1] = 1
-
-        # Create the matrix
-        data = np.array([north, middle, south])
-        A = sps.spdiags(data, [1, 0, -1], len(self.h), len(self.h), format = 'csr').T
-
-        # rhs
         rhs = np.zeros(len(self.h))
-        for i in range(len(self.h)-2):
-            i=i+1
-            rhs[i] = 6 * self.eta_0 * self.u_b * (self.h[i+1] - self.h[i-1]) / (2 * dx)
+        A = sps.eye(len(self.h))
+        A = A.tocsr()
+
+        for i in range(1, len(self.h)-1):
+            A[i, i-1] = -3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1 / (2 * dx) + self.h[i]**3 * 1 / (dx**2)
+            A[i, i] = self.h[i]**3 * (-2) / (dx**2)
+            A[i, i+1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1 / (2 * dx) + self.h[i]**3 * 1 / (dx**2)
+    
+            rhs[i] = 6 * self.u_b * self.eta_0 * (self.h[i+1] - self.h[i-1]) / (2 * dx)
 
         # Solve the system
         self.p = sps.linalg.spsolve(A, rhs)
@@ -177,8 +159,8 @@ class AS7:
         self.F = np.trapezoid(self.p, self.x) 
         self.F = self.F * self.b
         if printbol:
-            print(f"The load capacity is: {self.F:.3g} N")
-            print(f"The total load capacity is: {self.F*self.number_pads:.3g} N")
+            print(f"The load capacity is: {self.F:.4g} N")
+            print(f"The total load capacity is: {self.F*self.number_pads:.4g} N")
 
 
         if plot:
@@ -319,7 +301,7 @@ class AS7:
     
 
 if __name__ == '__main__':
-    if False: # Part a
+    if True: # Part a
         print('Part a')
         print('Fixed inclined pads')
         inc = AS7(type = 0)
@@ -334,7 +316,7 @@ if __name__ == '__main__':
         par.pressure_distrubution_2d(printbol=True)
 
     
-    if False: # Part b
+    if True: # Part b
         inc = AS7(type = 0)
         inc.geometry_parameters(plot = False)
         inc.pressure_distrubution(plot = False)
@@ -358,7 +340,7 @@ if __name__ == '__main__':
         np.savetxt('W5/data/pressureDistribution11d.txt', np.array([Y.flatten('F'), X.flatten('F'), Pres_1d1]).T)
 
 
-    if False: # Part c
+    if True: # Part c
         print('Part c')
         inc = AS7(type = 0)
         inc.geometry_parameters(plot = False)

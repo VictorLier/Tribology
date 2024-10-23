@@ -173,7 +173,7 @@ class AS6:
         self.Dt_m = 2 * self.u_b * self.l * self.eta_0 / (self.rho_0 * self.Cp * self.s_h**2) * self.H_p/self.Q # (8.13) - Adiabatic temperature rise
 
 
-    def pressure_distrubution(self, plot = False, printbol = False) -> None:
+    def pressure_distrubution2(self, plot = False, printbol = False) -> None:
         '''
         Calculates the pressure distribution with a finite difference method
 
@@ -234,14 +234,55 @@ class AS6:
             np.savetxt(f'W4/data/pressureDistribution{self.type}.txt', np.array([self.x, self.p]).T)
 
 
+    def pressure_distrubution(self, plot = False, printbol = False) -> None:
+        '''
+        Calculates the pressure distribution with a finite difference method
+
+        plot (bool): If True, plots the pressure distribution
+
+        printbol (bool): If True, prints the load capacity
+        '''
+        dx = abs(self.x[0] - self.x[1])
+
+        rhs = np.zeros(len(self.h))
+        A = sps.eye(len(self.h))
+        A = A.tocsr()
+
+        for i in range(1, len(self.h)-1):
+            A[i, i-1] = -3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1 / (2 * dx) + self.h[i]**3 * 1 / (dx**2)
+            A[i, i] = self.h[i]**3 * (-2) / (dx**2)
+            A[i, i+1] = 3 * self.h[i]**2 * (self.h[i+1] - self.h[i-1]) / (2 * dx) * 1 / (2 * dx) + self.h[i]**3 * 1 / (dx**2)
+    
+            rhs[i] = 6 * self.u_b * self.eta_0 * (self.h[i+1] - self.h[i-1]) / (2 * dx)
+
+        # Solve the system
+        self.p = sps.linalg.spsolve(A, rhs)
+
+        # Calculate the load capacity
+        self.F = np.trapezoid(self.p, self.x) 
+        self.F = self.F * self.b
+        if printbol:
+            print(f"The load capacity is: {self.F:.4g} N")
+            print(f"The total load capacity is: {self.F*self.number_pads:.4g} N")
+
+
+        if plot:
+            plt.figure()
+            plt.plot(self.x, self.p)
+            plt.xlabel('x [m]')
+            plt.ylabel('p [Pa]')
+            plt.title('Pressure distribution')
+            plt.show()
+
+            np.savetxt(f'W4/data/pressureDistribution{self.type}.txt', np.array([self.x, self.p]).T)
 
 if __name__ == '__main__':
-    if False: # Test
+    if True: # Test
         print("Test")
         test = AS6()
 
 
-    if False: # Part a
+    if True: # Part a
         print('Part a')
         inc = AS6(type = 0)
         inc.geometry_parameters(plot = True, print_bol = True)
@@ -250,7 +291,7 @@ if __name__ == '__main__':
         par.geometry_parameters(plot = True, print_bol = True)
 
 
-    if False: # Part b
+    if True: # Part b
         print("Part b:")
         inc = AS6(type = 0)
         inc.geometry_parameters()
@@ -266,7 +307,7 @@ if __name__ == '__main__':
             print(f"The friction coefficient for the parallel-step is lower than the fixed inclined pads: {par.mu:.4g} < {inc.mu:.4g}")
 
 
-    if False: # Part c
+    if True: # Part c
         print("Part c:")
         inc = AS6(type = 0)
         inc.geometry_parameters()
@@ -300,7 +341,7 @@ if __name__ == '__main__':
         par.pressure_distrubution(plot = True, printbol=True)
         print(par.wm_z)
 
-    if False: # Part e
+    if True: # Part e
         print("Part e:")
         loads = np.linspace(1e5, 10e5, 100)
         film_thickness_0 = np.zeros(len(loads))
