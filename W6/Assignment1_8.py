@@ -132,6 +132,10 @@ if __name__ == '__main__':
         plt.grid(True)
         plt.show()
 
+        np.savetxt(f'W6/data/totalPower.txt', np.array([film_tykkelse, totalPower]).T)
+        np.savetxt(f'W6/data/viscPower.txt', np.array([film_tykkelse, viscPower]).T)
+        np.savetxt(f'W6/data/pumpPower.txt', np.array([film_tykkelse, pumpPower]).T)
+
         print(min(totalPower))
         # print film thickness for minimum power
         print(film_tykkelse[np.argmin(totalPower)])
