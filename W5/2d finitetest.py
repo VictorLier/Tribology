@@ -30,12 +30,12 @@ def finit_2d(nx: int = 50, ny: int = 50, l: float = 0.1, b:float = 0.1, u_b: flo
                 h[:,i] = h_0
 
     M = sps.eye(nx * ny)
-    M = M.tocsr()
+    M = M.tocsr() # Convert to Compressed Sparse Row format
 
     rhs = np.zeros(nx * ny)
 
-    for i in range(1, nx-1):
-        for j in range(1, ny-1):
+    for i in range(1, nx-1):        # Loop over the x direction
+        for j in range(1, ny-1):    # Loop over the y direction
             c = j + ny * (i)  # Current index
             n = c + 1  # North neighbor
             s = c - 1  # South neighbor
@@ -43,7 +43,7 @@ def finit_2d(nx: int = 50, ny: int = 50, l: float = 0.1, b:float = 0.1, u_b: flo
             w = j + ny * (i - 1)  # West neighbor
 
             # Filling the M matrix
-            M[c, c] = -2 * h[j, i]**3 * (1/(dx**2) + 1/(dy**2))
+            M[c, c] = -2 * h[j, i]**3 * (1/(dx**2) + 1/(dy**2))      
             M[c, n] = 3 * h.flatten('F')[c]**2 * (h.flatten('F')[n] - h.flatten('F')[s]) / (2 * dy**2) + h.flatten('F')[c]**3 / (dy**2)
             M[c, s] = -3 * h.flatten('F')[c]**2 * (h.flatten('F')[n] - h.flatten('F')[s]) / (2 * dy**2) + h.flatten('F')[c]**3 / (dy**2)
             M[c, e] = 3 * h.flatten('F')[c]**2 * (h.flatten('F')[e] - h.flatten('F')[w]) / (2 * dx**2) + h.flatten('F')[c]**3 / (dx**2)
@@ -52,9 +52,9 @@ def finit_2d(nx: int = 50, ny: int = 50, l: float = 0.1, b:float = 0.1, u_b: flo
             # Filling the rhs vector
             rhs[c] = 6 * u_b * eta_0 * (h.flatten('F')[e] - h.flatten('F')[w]) / (2 * dx)
 
-    p = sps.linalg.spsolve(M, rhs)
+    p = sps.linalg.spsolve(M, rhs)  # Solve the linear system
 
-    p = p.reshape(ny, nx, order = 'F')
+    p = p.reshape(ny, nx, order = 'F')  # Reshape the solution to a 2D array
 
 
     return X, Y, p
