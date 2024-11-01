@@ -4,7 +4,7 @@ import numpy as np
 # % Bearing Properties (PAGE 14 of JOURNAL BEARING DATA BOOK) 
 # % Two-axial-groove bearing, L/D = 0.5
 # %
-# %                  S         E     Phi     Q       P     T          Kxx  Kxy   Kyx       Kyy  Bxx   Bxy    Byx    Byy
+# %                  S         E     Phi   Q or Q  P or Qe T or fJ/psi Kx  Kxy   Kyx     Kyy  Bxx   Bxy    Byx    Byy
 # %
 Table1 = np.array([[5.96    ,0.0750, 82.6, 0.0663, 1.00 , 111.5  ,  1.77, 13.6, -13.1   , 2.72, 27.2 , 2.06, 2.06, 14.9],
                    [4.43    ,0.100 , 80.4, 0.0880, 0.999,  83.0  ,  1.75, 10.3,  -9.66  , 2.70, 20.6 , 2.08, 2.08, 11.4],
