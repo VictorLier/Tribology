@@ -20,7 +20,7 @@ omega = 2 * np.pi * N   # [rad/s]
 c = 100e-6  # [m]
 w = 5e3    # [N]
 eta =  0.08   # [N*s/m^2]
-rho = 860  # [kg/m^3]
+rho = 876  # [kg/m^3]
 nu = eta / rho  # [m^2/s]
 r_b = D/2
 psi = c/r_b
@@ -60,7 +60,7 @@ plt.show()
 # speed 30 Hz is now only considered
 # take heat balance into account
 
-iterations = 20
+iterations = 10
 
 w_air = 1 # [m/s] air velocity of surroundings
 # Vogelpohl equation
@@ -89,31 +89,25 @@ def eta_i(temp):
 
 t_mean = np.zeros(iterations)
 t = np.zeros(iterations)
-t_mean[0] = 40
 t[0] = 40
+N = 30
+omega = 2*np.pi*N
 
 for i in range(iterations-1):
-    S_current = eta*N[-1]*b*D/w*(r_b/c)**2
-
+    S_current = eta*N*b*D/w*(r_b/c)**2
     Q_current = np.interp(S_current, S, Q)
     T_current = np.interp(S_current, S, T)
     epsi_current = np.interp(S_current, S, E)
 
-    if i > 0:
-        eta = eta_i(t[i-1])
-
+    eta = eta_i(t[i])
     q_f = np.pi*c**3/(3*eta*L_mark/D) * (1+3/2*epsi_current**2)*p_f
-    q = r_b*omega[-1]*c*b*Q_current + q_f   # assuming chi = 1
+    q = r_b*omega*c*b*Q_current + q_f   # assuming chi = 1
     f_J = psi * T_current
 
-    t[i] = ((1-lamb)*(f_J*r_b*w*omega[-1] + alpha*A*t_0) + Cp*rho*q*t_1) / (Cp*rho*q + alpha*A*(1-lamb))
-
-    # print(eta)
-    # print(t[i])
-
-    t_mean[i+1] = t_mean[i] + damping * (t[i] - t_mean[i])
+    t_new = ((1-lamb)*(f_J*r_b*w*omega + alpha*A*t_0) + Cp*rho*q*t_1) / (Cp*rho*q + alpha*A*(1-lamb))
+    t[i+1] = t[i] + damping * (t_new - t[i])
 
 iterations = np.arange(iterations)
-plt.plot(iterations, t_mean)
+plt.plot(iterations, t)
 # plt.plot(iterations, t)
 plt.show()
