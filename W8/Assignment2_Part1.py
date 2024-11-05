@@ -19,6 +19,7 @@ pf = 2e5            # Feed pressure  [N]
 m_p = np.array([0, 0, 0.5, 2/3, 0, 0])  # pre load factor [-]
 LD_fac = np.array([0.5, 1.0, 0.5, 1.0, 0.5, 0.5]) # L/D factor [-]
 L = D * LD_fac      # Bearing length [m]
+Cb = (1 - m_p) * Cp # Bearing clearance [m]
 
 # fine milled surfaces
 Ra_a = 0.4e-6   
@@ -26,40 +27,119 @@ Ra_b = 0.8e-6
 Rq_a = Ra_a * 1.25
 Rq_b = Ra_b * 1.25
 
-N = np.linspace(0.1, 10, 50)
-Lambda_hydro = np.zeros((len(N), 6))
-
-rho = 860 # [kg/m^3]
-cp = 2000 # [J/kg*K]
-
 # ISO VG 32
-eta = 0.08
+iterations = 20
+w_air = 1 # [m/s] air velocity of surroundings
+alpha = 9.807 * (0.7 + 1.2 * w_air**(1/2))
+A = 9 * D * D**(1/2)
+rho = 876 # [kg/m^3]
+cp = 1964 # [J/kg*K]
+lamb = 1/3
+
 nu_40 = 0.08/rho*1e6
 t_40 = 40
 nu_100 = 0.007/rho*1e6
 t_100 = 100
 m_lub = (np.log(np.log(nu_100 + 0.8)) - np.log(np.log(nu_40 + 0.8))) / (np.log((t_40+273.15)/(t_100+273.15)))
 k_lub = np.log(np.log(nu_40 + 0.8)) + m_lub*np.log(t_40+273.15)
+t_1 = 30
+t_0 = 20
+p_f = 2e5 # [Pa]
+L_mark = L_norm/2
+damping = 0.5
 
+def eta_i(temp):
+    return rho*1e-6*(np.exp(np.exp(-m_lub*np.log(temp+273.15) + k_lub)) - 0.8)
+
+t_mean = np.zeros(iterations)
+t = np.zeros(iterations)
+t[0] = 40
+N = 30
+omega = 2*np.pi*N
+eta = eta_i(t[0])
+lub_temp = np.zeros(len(Tables))
+
+# 1. 10*np.pi/180 * R_b = 0.00888: for groove with length L, b/a = 0.18, a/L = 3.5: Qf = 2 * 0.15  
+# 2. 10*np.pi/180 * R_b = 0.00888: for groove with length L, b/a = 0.08, a/L = 1.7: Qf = 2 * 0.15
+Qf = np.array([2 * 0.15, 2*0.15, 0, 0, 0, 0])
+
+for j in range(len(Tables)):
+    for i in range(iterations-1):
+        table = np.flip(Tables[j] , axis=0)
+        S_current = eta*N*L[j]*D/W*(R_b/Cp)**2
+        Qs = np.interp(S_current, table[:,0], table[:,3]) 
+        Qe = np.interp(S_current, table[:,0], table[:,4])
+        T_current = np.interp(S_current, table[:,0], table[:,5])
+        epsi_current = np.interp(S_current, table[:,0], table[:,1])
+
+        eta = eta_i(t[i])
+        qf = 8*Cp**3/eta * pf * Qf[j]
+        chi = 1 # !!!!!!!!!!!!
+        q = R_b*N*2*np.pi*Cp*L[j]*(Qs + (1 - chi)*Qe) + qf
+        f_J = psi * T_current
+
+        t_new = ((1-lamb)*(f_J*R_b*W*omega + alpha*A*t_0) + Cp*rho*q*t_1) / (Cp*rho*q + alpha*A*(1-lamb))
+        t[i+1] = t[i] + damping * (t_new - t[i])
+    
+    lub_temp[j] = t[-1]
+
+    plt.plot(np.arange(iterations), t, label=f'{j+1}')
+
+plt.xlabel('Iterations')
+plt.ylabel('Temperature [C]')
+plt.legend()
+plt.show()
+
+print(f"lubricant temperature for bearing 1: {lub_temp[0]:.3f} C and dynamic viscosity: {eta_i(lub_temp[0]):.3f} m^2/s")
+print(f"lubricant temperature for bearing 2: {lub_temp[1]:.3f} C and dynamic viscosity: {eta_i(lub_temp[1]):.3f} m^2/s")
+print(f"lubricant temperature for bearing 3: {lub_temp[2]:.3f} C and dynamic viscosity: {eta_i(lub_temp[2]):.3f} m^2/s")
+print(f"lubricant temperature for bearing 4: {lub_temp[3]:.3f} C and dynamic viscosity: {eta_i(lub_temp[3]):.3f} m^2/s")
+print(f"lubricant temperature for bearing 5: {lub_temp[4]:.3f} C and dynamic viscosity: {eta_i(lub_temp[4]):.3f} m^2/s")
+print(f"lubricant temperature for bearing 6: {lub_temp[5]:.3f} C and dynamic viscosity: {eta_i(lub_temp[5]):.3f} m^2/s")
+print("##############################################################")
+
+eta = np.array([eta_i(lub_temp[i]) for i in range(len(Tables))])
+
+# laminar flow condition
+print(f"laminar flow condition, Raynolds number is less than 2400")
+print(f" the maximum velocity is thereby: {2400 * eta[0] / (Cp * rho ) / (2 * np.pi * R_b):.3f} Hz for bearing 1")
+print(f" the maximum velocity is thereby: {2400 * eta[1] / (Cp * rho ) / (2 * np.pi * R_b):.3f} Hz for bearing 2")
+print(f" the maximum velocity is thereby: {2400 * eta[2] / (Cp * rho ) / (2 * np.pi * R_b):.3f} Hz for bearing 3")
+print(f" the maximum velocity is thereby: {2400 * eta[3] / (Cp * rho ) / (2 * np.pi * R_b):.3f} Hz for bearing 4")
+print(f" the maximum velocity is thereby: {2400 * eta[4] / (Cp * rho ) / (2 * np.pi * R_b):.3f} Hz for bearing 5")
+print(f" the maximum velocity is thereby: {2400 * eta[5] / (Cp * rho ) / (2 * np.pi * R_b):.3f} Hz for bearing 6")
+print(f" calculated using the formula: Re = 2400 = rho * v * Cp / eta")
+print("##############################################################")
 
 # 1) find minumum angular velocity - determine the speed at which the clearance minus the eccentricity is equal to the minimum film thickness
+N = np.linspace(0.1, 25, 100)
+Lambda_hydro = np.zeros((len(N), 6))
 for j in range(len(Tables)):
     table = np.flip(Tables[j] , axis=0)
-    S = table[:,0]     # Sommerfeld number
-    E = table[:,1]     # eccentricity ratio
-    Sommerfeld = eta*N*D*L[j]/(psi**2*W)
-    for i in range(len(N)):
-        epsilon = np.interp(Sommerfeld[i], S, E)
-        h_min = Cp * (1 - epsilon)
-        Lambda_hydro[i, j] = h_min / (Rq_a**2 + Rq_b**2)**(1/2)
+    Sommerfeld = eta[j]*N*D*L[j]/(psi**2*W)
+
+    epsilon = np.interp(Sommerfeld, table[:,0], table[:,1])
+    # h_min = - epsilon * Cb[j] + Cp
+    h_min = Cp*(1 - epsilon)
+    Lambda_hydro[:, j] = h_min / (Rq_a**2 + Rq_b**2)**(1/2)
+
+    h_min_10 = 10 * (Rq_a**2 + Rq_b**2)**(1/2)
+    # epsilon_10 = (Cp - h_min_10) / Cb[j]
+    epsilon_10 = 1 - h_min_10 / Cp
+    table = Tables[j]
+    Sommerfeld_10 = np.interp(epsilon_10, table[:,1], table[:,0])
+    N_10 = Sommerfeld_10 * psi**2 * W / (eta[j] * D * L[j])
+    print(f"bearing {j+1} has minimum speed: {N_10:.3f} Hz")
 
 plt.plot(N, Lambda_hydro)
 plt.xlabel('Speed [Hz]')
 plt.ylabel('Lambda')
-plt.legend(['Table1', 'Table2', 'Table3', 'Table4', 'Table5', 'Table6'])
-plt.ylim(0, 20)
+plt.legend(['1', '2', '3', '4', '5', '6'])
+plt.ylim(0, 50)
 plt.axhline(y=10, color='r', linestyle='--')
-# plt.show()
+plt.show()
+
+print("##############################################################")
 
 # 2) Find maximum angular velocity
 
@@ -68,7 +148,7 @@ M = np.array([[mass, 0], [0, mass]])    # mass matrix
 
 for j in range(len(Tables)):
     table = np.flip(Tables[j], axis = 0)
-    Sommerfeld = eta*N*D*L[j]/(psi**2*W)
+    Sommerfeld = eta[j]*N*D*L[j]/(psi**2*W)
     for i in range(len(N)):
         epsilon = np.interp(Sommerfeld[i], table[:,0], table[:,1])
         Phi     = np.interp(Sommerfeld[i], table[:,0], table[:,2]) * np.pi/180
@@ -102,15 +182,14 @@ for j in range(len(Tables)):
 
 # 3) maximum lubrications consumptions (flow rate)
 
-N = np.linspace(1, 20, 100)        # Speed [Hz]
+N = np.linspace(1, 250, 100)        # Speed [Hz]
 for j in range(len(Tables)):
     table = np.flip(Tables[j], axis = 0)
-    Sommerfeld = eta*N*D*L[j]/(psi**2*W)
+    Sommerfeld = eta[j]*N*D*L[j]/(psi**2*W)
 
     Qs = np.interp(Sommerfeld, table[:,0], table[:,3]) 
     Qe = np.interp(Sommerfeld, table[:,0], table[:,4])
-    Qf = 1 # !!!!!!!!!!!!
-    qf = 8*h_min**3/eta * pf * Qf
+    qf = 8*h_min**3/eta[j] * pf * Qf[j]
     chi = 1 # !!!!!!!!!!!!
     q = R_b*N*2*np.pi*Cp*L[j]*(Qs + (1 - chi)*Qe) + qf
 
@@ -118,7 +197,7 @@ for j in range(len(Tables)):
 
 plt.xlabel('Speed [Hz]')
 plt.ylabel('Flow rate [m^3/s]')
-plt.legend(['Table1', 'Table2', 'Table3', 'Table4', 'Table5', 'Table6'])
+plt.legend(['1', '2', '3', '4', '5', '6'])
 plt.show()
 
 # 4) maximum friction loss 
@@ -126,20 +205,13 @@ plt.show()
 N = np.linspace(1, 200, 100) 
 for j in range(len(Tables)):
     table = np.flip(Tables[j], axis = 0)
-    Sommerfeld = eta*N*D*L[j]/(psi**2*W)
+    Sommerfeld = eta[j]*N*D*L[j]/(psi**2*W)
 
     fJ = np.interp(Sommerfeld, table[:,0], table[:,5]) * psi
-
     H = fJ * R_b * N * 2 * np.pi * W
-
     plt.plot(N, H)
 
 plt.xlabel('Speed [Hz]')
 plt.ylabel('Friction loss [W]')
-plt.legend(['Table1', 'Table2', 'Table3', 'Table4', 'Table5', 'Table6'])
+plt.legend(['1', '2', '3', '4', '5', '6'])
 plt.show()
-
-
-
-
-
