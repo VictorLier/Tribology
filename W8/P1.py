@@ -100,7 +100,7 @@ for i in range(iterations-1):
     epsi_current = np.interp(S_current, S, E)
 
     eta = eta_i(t[i])
-    q_f = np.pi*c**3/(3*eta*L_mark/D) * (1+3/2*epsi_current**2)*p_f
+    q_f = np.pi*c**3/(3*eta*L_mark/D) * ( 1 + 3/2 * epsi_current**2 )*p_f
     q = r_b*omega*c*b*Q_current + q_f   # assuming chi = 1
     f_J = psi * T_current
 
