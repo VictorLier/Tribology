@@ -66,17 +66,16 @@ Qf = np.array([2 * 0.15, 2*0.15, 0, 0, 0, 0])
 for j in range(len(Tables)):
     for i in range(iterations-1):
         table = np.flip(Tables[j] , axis=0)
+        eta = eta_i(t[i])
         S_current = eta*N*L[j]*D/W*(R_b/Cp)**2
         Qs = np.interp(S_current, table[:,0], table[:,3]) 
         Qe = np.interp(S_current, table[:,0], table[:,4])
-        T_current = np.interp(S_current, table[:,0], table[:,5])
+        f_J = psi * np.interp(S_current, table[:,0], table[:,5])
         epsi_current = np.interp(S_current, table[:,0], table[:,1])
 
-        eta = eta_i(t[i])
         qf = 8*Cp**3/eta * pf * Qf[j]
         chi = 1 # !!!!!!!!!!!!
         q = R_b*N*2*np.pi*Cp*L[j]*(Qs + (1 - chi)*Qe) + qf
-        f_J = psi * T_current
 
         t_new = ((1-lamb)*(f_J*R_b*W*omega + alpha*A*t_0) + Cp*rho*q*t_1) / (Cp*rho*q + alpha*A*(1-lamb))
         t[i+1] = t[i] + damping * (t_new - t[i])
@@ -143,8 +142,9 @@ print("##############################################################")
 
 # 2) Find maximum angular velocity
 
-N = np.linspace(10, 1000, 10000)        # Speed [Hz]
-M = np.array([[mass, 0], [0, mass]])    # mass matrix           
+N = np.linspace(10, 1000, 100)        # Speed [Hz]
+M = np.array([[mass, 0], [0, mass]])    # mass matrix
+eigen_RE = np.zeros((len(N), 6))           
 
 for j in range(len(Tables)):
     table = np.flip(Tables[j], axis = 0)
@@ -172,6 +172,10 @@ for j in range(len(Tables)):
 
         if np.all(np.real(s) < 0):         # if eigenvalues s have negative real part, the system is stable
             omega_max = np.max(np.abs(np.imag(s))) / (2 * np.pi)
+                    
+                    
+        eigen_RE[i, j] = np.real(s[np.abs(np.imag(s)) > 0][0])
+
 
         if np.any(np.real(s) > 0):         # if eigenvalues s have positive real part, the system is unstable
             print(f"bearing {j+1} is unstable at speed {N[i]:.3f} Hz with undamped natural frequency: {omega_max:.3f} in Hz")
@@ -179,6 +183,13 @@ for j in range(len(Tables)):
     
     if i == len(N)-1:                      # if the loop reaches the end, the system is stable at all speeds
         print(f"bearing {j+1} is stable at all speeds with maximum speed: {N[i]:.3f} Hz")
+
+plt.figure()
+plt.plot(N, eigen_RE)
+plt.xlabel('Speed [Hz]')
+plt.ylabel('Real part of eigenvalues')
+plt.legend(['1', '2', '3', '4', '5', '6'])
+plt.show()
 
 # 3) maximum lubrications consumptions (flow rate)
 
