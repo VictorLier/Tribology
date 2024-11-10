@@ -235,6 +235,10 @@ class AS7:
                 M[c, e] = 3 * h.flatten('F')[c]**2 * (h.flatten('F')[e] - h.flatten('F')[w]) / (2 * dx**2) + h.flatten('F')[c]**3 / (dx**2)
                 M[c, w] = -3 * h.flatten('F')[c]**2 * (h.flatten('F')[e] - h.flatten('F')[w]) / (2 * dx**2) + h.flatten('F')[c]**3 / (dx**2)
 
+                
+
+
+
                 # Filling the rhs vector
                 rhs[c] = 6 * self.u_b * self.eta_0 * (h.flatten('F')[e] - h.flatten('F')[w]) / (2 * dx)
         
