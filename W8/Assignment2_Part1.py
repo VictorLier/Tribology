@@ -46,7 +46,7 @@ k_lub = np.log(np.log(nu_40 + 0.8)) + m_lub*np.log(t_40+273.15)
 t_1 = 30
 t_0 = 20
 p_f = 2e5 # [Pa]
-damping = 0.5
+damping = 0.4
 chi = 1 # !
 
 def eta_i(temp):
@@ -78,7 +78,7 @@ def calculate_lub_temp(j, N, plotswitch):
             t[-1] = np.mean(t[-2:])
             break
 
-        if np.abs(t[i + 1] - t[i]) < 1e-2:
+        if np.abs((t[i + 1] - t[i])/t[i]) < 1e-3:
             break
         
         i += 1
@@ -86,10 +86,11 @@ def calculate_lub_temp(j, N, plotswitch):
     lub_temp = t[-1]
     if plotswitch == True:
         plt.plot(np.arange(len(t)), t, label=f'{j + 1}')
+        np.savetxt('ASSIGN2_AUST/temp' + str(j) + '.txt', np.array([np.arange(len(t)),t]).T)
 
     return lub_temp
 
-# Example usage:
+# Example usage: save txt file
 plt.figure()
 lub_temp = np.zeros(len(Tables))
 for j in range(len(Tables)):
@@ -157,8 +158,6 @@ for j in range(len(Tables)):
     # finding the exact speed where lambda = 10 using interpolation
     N_10 = np.interp(10, Lambda_hydro[:, j], N)
 
-
-
     # h_min_10 = 10 * (Rq_a**2 + Rq_b**2)**(1/2)
     # # epsilon_10 = (Cp - h_min_10) / Cb[j]
     # epsilon_10 = 1 - h_min_10 / Cp
@@ -176,16 +175,25 @@ plt.ylim(0, 50)
 plt.axhline(y=10, color='r', linestyle='--')
 plt.show()
 
+np.savetxt('ASSIGN2_AUST/Nmin1.txt', np.array([N, Lambda_hydro[:,0]]).T)
+np.savetxt('ASSIGN2_AUST/Nmin2.txt', np.array([N, Lambda_hydro[:,1]]).T)
+np.savetxt('ASSIGN2_AUST/Nmin3.txt', np.array([N, Lambda_hydro[:,2]]).T)
+np.savetxt('ASSIGN2_AUST/Nmin4.txt', np.array([N, Lambda_hydro[:,3]]).T)
+np.savetxt('ASSIGN2_AUST/Nmin5.txt', np.array([N, Lambda_hydro[:,4]]).T)
+np.savetxt('ASSIGN2_AUST/Nmin6.txt', np.array([N, Lambda_hydro[:,5]]).T)
+
 print("##############################################################")
 
 # 2) Find maximum angular velocity
 
 N = np.linspace(10, 2000, 1000)        # Speed [Hz]
-M = np.array([[mass, 0], [0, mass]])    # mass matrix
+M = np.array([[mass/2, 0], [0, mass/2]])    # mass matrix
 eigen_RE1 = np.zeros((len(N), 6))
 eigen_RE2 = np.zeros((len(N), 6))
 eigen_RE3 = np.zeros((len(N), 6))
-eigen_RE4 = np.zeros((len(N), 6))           
+eigen_RE4 = np.zeros((len(N), 6))
+
+N_stability = np.zeros(6)
 
 for j in range(len(Tables)):
     eigenswitch = 0
@@ -231,9 +239,11 @@ for j in range(len(Tables)):
         if np.any(np.real(s) > 0) and eigenswitch == 0:         # if eigenvalues s have positive real part, the system is unstable
             eigenswitch = 1
             print(f"bearing {j+1} is unstable at speed {N[i]:.3f} Hz with undamped natural frequency: {omega_max:.3f} in Hz")
+            N_stability[j] = N[i]
     
     if i == len(N)-1 and eigenswitch == 0:                      # if the loop reaches the end, the system is stable at all speeds
         print(f"bearing {j+1} is stable at all speeds with maximum speed: {N[i]:.3f} Hz")
+        N_stability[j] = N[i]
 
 # make a figure with 4 subplots, each subplot contains the real part of the first 4 eigenvalues
 plt.figure()
@@ -283,8 +293,11 @@ plt.show()
 
 # 3) maximum lubrications consumptions (flow rate)
 
-N = np.linspace(1, 250, 100)        # Speed [Hz]
 for j in range(len(Tables)):
+    N_max = np.min([converged_speeds[j], N_stability[j]])
+    if N_max > 500:
+        N_max = 500
+    N = np.linspace(0, N_max, 100)       # Speed [Hz]
     table = np.flip(Tables[j], axis = 0)
     eta = np.zeros(len(N))
     for i in range(len(N)):
@@ -293,21 +306,27 @@ for j in range(len(Tables)):
 
     Qs = np.interp(Sommerfeld, table[:,0], table[:,3]) 
     Qe = np.interp(Sommerfeld, table[:,0], table[:,4])
-    qf = 8*h_min**3/eta * pf * Qf[j]
+    epsilon = np.interp(Sommerfeld, table[:,0], table[:,1])
+    h1 = Cp - epsilon * Cb[j]
+    qf = 8*h1**3/eta * pf * Qf[j]
     chi = 1 # !!!!!!!!!!!!
     q = R_b*N*2*np.pi*Cp*L[j]*(Qs + (1 - chi)*Qe) + qf
 
-    plt.plot(N, q)
+    plt.plot(N, q*60*60*1000)
+    np.savetxt('ASSIGN2_AUST/flowrate' + str(j+1) + '.txt', np.array([N, q*60*60*1000]).T)
 
 plt.xlabel('Speed [Hz]')
-plt.ylabel('Flow rate [m^3/s]')
+plt.ylabel('Flow rate [L/h]')
 plt.legend(['1', '2', '3', '4', '5', '6'])
 plt.show()
 
 # 4) maximum friction loss 
 
-N = np.linspace(1, 200, 100) 
 for j in range(len(Tables)):
+    N_max = np.min([converged_speeds[j], N_stability[j]])
+    if N_max > 500:
+        N_max = 500
+    N = np.linspace(0, N_max, 100)       # Speed [Hz]
     table = np.flip(Tables[j], axis = 0)
     eta = np.zeros(len(N))
     for i in range(len(N)):
@@ -316,9 +335,10 @@ for j in range(len(Tables)):
 
     fJ = np.interp(Sommerfeld, table[:,0], table[:,5]) * psi
     H = fJ * R_b * N * 2 * np.pi * W
-    plt.plot(N, H)
+    np.savetxt('ASSIGN2_AUST/loss' + str(j+1) + '.txt', np.array([N, H*1e-3]).T)
+    plt.plot(N, H*1e-3)
 
 plt.xlabel('Speed [Hz]')
-plt.ylabel('Friction loss [W]')
+plt.ylabel('Friction loss [kW]')
 plt.legend(['1', '2', '3', '4', '5', '6'])
 plt.show()
