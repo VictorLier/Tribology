@@ -192,6 +192,7 @@ eigen_RE1 = np.zeros((len(N), 6))
 eigen_RE2 = np.zeros((len(N), 6))
 eigen_RE3 = np.zeros((len(N), 6))
 eigen_RE4 = np.zeros((len(N), 6))
+eigen = np.zeros((len(N), 6, 4))
 
 N_stability = np.zeros(6)
 
@@ -234,6 +235,8 @@ for j in range(len(Tables)):
         eigen_RE2[i, j] = np.real(s[1])
         eigen_RE3[i, j] = np.real(s[2])
         eigen_RE4[i, j] = np.real(s[3])
+        eigen[i, j, :] = np.real(s)
+
 
 
         if np.any(np.real(s) > 0) and eigenswitch == 0:         # if eigenvalues s have positive real part, the system is unstable
@@ -281,15 +284,81 @@ plt.legend(['1', '2', '3', '4', '5', '6'])
 
 plt.show()
 
-# # plt.plot(N, eigen_RE1)
-# # plt.plot(N, eigen_RE2)
+plt.figure()
+# plt.plot(N, eigen_RE1[:,0], label='1')
+# plt.plot(N, eigen_RE1[:,1], label='2')
+# plt.plot(N, eigen_RE1[:,2], label='3')
+# plt.plot(N, eigen_RE1[:,3], label='4')
+# plt.plot(N, eigen_RE1[:,4], label='5')
+# plt.plot(N, eigen_RE1[:,5], label='6')
+
+# plt.plot(N, eigen_RE2[:,0])
+# plt.plot(N, eigen_RE2[:,1])
+# plt.plot(N, eigen_RE2[:,2])
+# plt.plot(N, eigen_RE2[:,3])
+# plt.plot(N, eigen_RE2[:,4])
+# plt.plot(N, eigen_RE2[:,5])
+
+# plt.plot(N, eigen_RE3[:,0])
+# plt.plot(N, eigen_RE3[:,1])
+# plt.plot(N, eigen_RE3[:,2])
+# plt.plot(N, eigen_RE3[:,3])
+# plt.plot(N, eigen_RE3[:,4])
+# plt.plot(N, eigen_RE3[:,5])
+
+# plt.plot(N, eigen_RE4[:,0])
+# plt.plot(N, eigen_RE4[:,1])
+# plt.plot(N, eigen_RE4[:,2])
+# plt.plot(N, eigen_RE4[:,3])
+# plt.plot(N, eigen_RE4[:,4])
+# plt.plot(N, eigen_RE4[:,5])
+
+plt.plot(N, eigen[:,0,:], color = 'b', label='1')
+plt.plot(N, eigen[:,1,:], color = 'orange', label='2')
+plt.plot(N, eigen[:,2,:], color = 'g', label='3')
+plt.plot(N, eigen[:,3,:], color = 'r', label='4')
+plt.plot(N, eigen[:,4,:], color = 'purple', label='5')
+plt.plot(N, eigen[:,5,:], color = 'brown', label='6')
+
+plt.legend()
+
+# plt.plot(N, eigen_RE2)
 # plt.plot(N, eigen_RE3)
-# # plt.plot(N, eigen_RE4)
-# plt.xlabel('Speed [Hz]')
-# plt.ylabel('Real part of eigenvalues')
-# plt.ylim(-100, 100)
-# plt.legend(['1', '2', '3', '4', '5', '6'])
-# plt.show()
+# plt.plot(N, eigen_RE4)
+plt.xlabel('Speed [Hz]')
+plt.ylabel('Real part of eigenvalues')
+plt.hlines(0, 0, 2000, colors='r', linestyles='--')
+plt.ylim(-100, 100)
+plt.show()
+
+np.savetxt('ASSIGN2_AUST/eigen11.txt', np.array([N, eigen[:,0,0]]).T)
+np.savetxt('ASSIGN2_AUST/eigen12.txt', np.array([N, eigen[:,0,1]]).T)
+np.savetxt('ASSIGN2_AUST/eigen13.txt', np.array([N, eigen[:,0,2]]).T)
+np.savetxt('ASSIGN2_AUST/eigen14.txt', np.array([N, eigen[:,0,3]]).T)
+
+np.savetxt('ASSIGN2_AUST/eigen21.txt', np.array([N, eigen[:,1,0]]).T)
+np.savetxt('ASSIGN2_AUST/eigen22.txt', np.array([N, eigen[:,1,1]]).T)
+np.savetxt('ASSIGN2_AUST/eigen23.txt', np.array([N, eigen[:,1,2]]).T)
+np.savetxt('ASSIGN2_AUST/eigen24.txt', np.array([N, eigen[:,1,3]]).T)
+
+np.savetxt('ASSIGN2_AUST/eigen31.txt', np.array([N, eigen[:,2,0]]).T)
+np.savetxt('ASSIGN2_AUST/eigen32.txt', np.array([N, eigen[:,2,1]]).T)
+np.savetxt('ASSIGN2_AUST/eigen33.txt', np.array([N, eigen[:,2,2]]).T)
+np.savetxt('ASSIGN2_AUST/eigen34.txt', np.array([N, eigen[:,2,3]]).T)
+
+np.savetxt('ASSIGN2_AUST/eigen41.txt', np.array([N, eigen[:,3,0]]).T)
+np.savetxt('ASSIGN2_AUST/eigen42.txt', np.array([N, eigen[:,3,1]]).T)
+np.savetxt('ASSIGN2_AUST/eigen43.txt', np.array([N, eigen[:,3,2]]).T)
+np.savetxt('ASSIGN2_AUST/eigen44.txt', np.array([N, eigen[:,3,3]]).T)
+
+np.savetxt('ASSIGN2_AUST/eigen51.txt', np.array([N, eigen[:,4,0]]).T)
+np.savetxt('ASSIGN2_AUST/eigen52.txt', np.array([N, eigen[:,4,1]]).T)
+np.savetxt('ASSIGN2_AUST/eigen53.txt', np.array([N, eigen[:,4,2]]).T)
+np.savetxt('ASSIGN2_AUST/eigen54.txt', np.array([N, eigen[:,4,3]]).T)
+np.savetxt('ASSIGN2_AUST/eigen61.txt', np.array([N, eigen[:,5,0]]).T)
+np.savetxt('ASSIGN2_AUST/eigen62.txt', np.array([N, eigen[:,5,1]]).T)
+np.savetxt('ASSIGN2_AUST/eigen63.txt', np.array([N, eigen[:,5,2]]).T)
+np.savetxt('ASSIGN2_AUST/eigen64.txt', np.array([N, eigen[:,5,3]]).T)
 
 # 3) maximum lubrications consumptions (flow rate)
 
