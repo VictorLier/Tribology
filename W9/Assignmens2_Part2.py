@@ -83,7 +83,7 @@ C = 102e-6
 N = 100
 eta_0 = eta_i(calculate_lub_temp(N))
 print(eta_0)
-omega_b = 30 * 2 * np.pi
+omega_b = N * 2 * np.pi
 R_b = 50.902e-3
 
 

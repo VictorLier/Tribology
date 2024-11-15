@@ -17,7 +17,7 @@ psi = Cp/R_b        # Eccentricity ratio
 pf = 1e5            # Feed pressure  [N]
 
 m_p = np.array([0, 0, 0.5, 2/3, 0, 0])  # pre load factor [-]
-LD_fac = np.array([0.5, 1.0, 0.5, 1.0, 0.5, 0.5]) # L/D factor [-]
+LD_fac = np.array([0.5,  1.0, 0.5, 1.0, 0.5, 0.5]) # L/D factor [-]
 L = D * LD_fac      # Bearing length [m]
 Cb = (1 - m_p) * Cp # Bearing clearance [m]
 
@@ -331,34 +331,12 @@ plt.hlines(0, 0, 2000, colors='r', linestyles='--')
 plt.ylim(-100, 100)
 plt.show()
 
-np.savetxt('ASSIGN2_AUST/eigen11.txt', np.array([N, eigen[:,0,0]]).T)
-np.savetxt('ASSIGN2_AUST/eigen12.txt', np.array([N, eigen[:,0,1]]).T)
-np.savetxt('ASSIGN2_AUST/eigen13.txt', np.array([N, eigen[:,0,2]]).T)
-np.savetxt('ASSIGN2_AUST/eigen14.txt', np.array([N, eigen[:,0,3]]).T)
-
-np.savetxt('ASSIGN2_AUST/eigen21.txt', np.array([N, eigen[:,1,0]]).T)
-np.savetxt('ASSIGN2_AUST/eigen22.txt', np.array([N, eigen[:,1,1]]).T)
-np.savetxt('ASSIGN2_AUST/eigen23.txt', np.array([N, eigen[:,1,2]]).T)
-np.savetxt('ASSIGN2_AUST/eigen24.txt', np.array([N, eigen[:,1,3]]).T)
-
-np.savetxt('ASSIGN2_AUST/eigen31.txt', np.array([N, eigen[:,2,0]]).T)
-np.savetxt('ASSIGN2_AUST/eigen32.txt', np.array([N, eigen[:,2,1]]).T)
-np.savetxt('ASSIGN2_AUST/eigen33.txt', np.array([N, eigen[:,2,2]]).T)
-np.savetxt('ASSIGN2_AUST/eigen34.txt', np.array([N, eigen[:,2,3]]).T)
-
-np.savetxt('ASSIGN2_AUST/eigen41.txt', np.array([N, eigen[:,3,0]]).T)
-np.savetxt('ASSIGN2_AUST/eigen42.txt', np.array([N, eigen[:,3,1]]).T)
-np.savetxt('ASSIGN2_AUST/eigen43.txt', np.array([N, eigen[:,3,2]]).T)
-np.savetxt('ASSIGN2_AUST/eigen44.txt', np.array([N, eigen[:,3,3]]).T)
-
-np.savetxt('ASSIGN2_AUST/eigen51.txt', np.array([N, eigen[:,4,0]]).T)
-np.savetxt('ASSIGN2_AUST/eigen52.txt', np.array([N, eigen[:,4,1]]).T)
-np.savetxt('ASSIGN2_AUST/eigen53.txt', np.array([N, eigen[:,4,2]]).T)
-np.savetxt('ASSIGN2_AUST/eigen54.txt', np.array([N, eigen[:,4,3]]).T)
-np.savetxt('ASSIGN2_AUST/eigen61.txt', np.array([N, eigen[:,5,0]]).T)
-np.savetxt('ASSIGN2_AUST/eigen62.txt', np.array([N, eigen[:,5,1]]).T)
-np.savetxt('ASSIGN2_AUST/eigen63.txt', np.array([N, eigen[:,5,2]]).T)
-np.savetxt('ASSIGN2_AUST/eigen64.txt', np.array([N, eigen[:,5,3]]).T)
+for i in range(6):
+    for k in range(4):
+        # remove datapoints from eigen that are above 100 and below -100, and make a N that matches the new eigen
+        eigenp = eigen[(eigen[:,i,k] < 50) & (eigen[:,i,k] > -100), i, k]
+        Np = N[(eigen[:,i,k] < 50) & (eigen[:,i,k] > -100)]
+        np.savetxt(f'ASSIGN2_AUST/eigen{i+1}{k+1}.txt', np.array([Np[::2], eigenp[::2]]).T)
 
 # 3) maximum lubrications consumptions (flow rate)
 
