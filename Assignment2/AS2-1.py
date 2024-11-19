@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import eig
+import scipy.sparse as sps
+import copy
 
 class Bearing:
-    def __init__(self, bearingtype:int = 0, PadLoes:int=0, ShaftDiameter:float=101.6e-3, RadialClearance:float=102e-6, preLoadFactor:float=0, LengthDiameterFactor:float=0.5, Load:float=460/2, surfaceRoughness:float=0.5e-6, oil:int=0, Revolutions:float=20, StartTemp:float = 40+273.15, feedPressure:float = 2e5) -> None:
+    def __init__(self, bearingtype:int = 0, PadLoes:int=0, ShaftDiameter:float=101.6e-3, RadialClearance:float=102e-6, preLoadFactor:float=0, LengthDiameterFactor:float=0.5, Load:float=460/2, surfaceRoughness:float=0.5e-6, oil:int=0, Revolutions:float=70, StartTemp:float = 40+273.15, feedPressure:float = 2e5) -> None:
         '''
         Creates a bearing object with the given parameters
 
@@ -454,6 +456,112 @@ class Bearing:
         self.friction_loss()
 
 
+    def Analytical(self, n_:int = 50, epsilon:float = 0.2) -> list:
+        '''
+        Calculates the analytical solution pressure distribution of the bearing
+
+        Args:
+            n (int): Resolution of the solution
+            epsilon (float): The eccentricity ratio
+        
+        Returns:
+            P (list): Pressure distribution
+            y (list): y coordinates
+            phi (list): phi coordinates
+        ''' 
+        y = np.linspace(-self.L/2, self.L/2, n_)
+        phi = np.linspace(0, np.pi, n_)
+        phi, y = np.meshgrid(phi, y)
+        P = 3 * self.eta * self.omega * epsilon / self.C_p * (self.L**2 / 4 - y**2) * np.sin(phi)/(1 + epsilon * np.cos(phi))**3
+        return P, y, phi
+
+
+    def Numerical(self, n_:int = 50, epsilon:float = 0.2) -> list:
+        '''
+        Calculates the pressure distribution with finite differnce method of the bearing
+
+        Args:
+            n (int): Resolution of the solution
+            epsilon (float): The eccentricity ratio
+        
+        Returns:
+            P (list): Pressure distribution
+            y (list): y coordinates
+            phi (list): phi coordinates
+        '''
+        y = np.linspace(-self.L/2, self.L/2, n_)
+        phi = np.linspace(0, np.pi, n_)
+        d_phi = abs(phi[1] - phi[0])
+        d_y = abs(y[1] - y[0])
+        
+        M = sps.eye(n_**2, format='csr')
+        rhs = np.zeros(n_**2)
+
+        for i in range(1, n_-1):
+            for j in range(1, n_-1):
+                c = j + i * n_
+                n = c + 1   # North
+                s = c - 1   # South
+                e = j + n_*(i+1)   # East
+                w = j - n_*(i-1)   # West
+
+                M[c, c] = 2 / d_phi**2 + 2 / d_y**2
+                M[c, n] = -1 / d_y**2
+                M[c, s] = -1 / d_y**2
+                M[c, e] = -1 / d_phi**2 + 3 * epsilon * np.sin(phi[i] / (1 + epsilon * np.cos(phi[i]))) / (2 * d_phi)
+                M[c, w] = -1 / d_phi**2 - 3 * epsilon * np.sin(phi[i] / (1 + epsilon * np.cos(phi[i]))) / (2 * d_phi)
+
+                rhs[c] = 6 * self.omega * self.eta * epsilon * np.sin(phi[i]) / (self.C_p**2 * (1 + epsilon * np.cos(phi[i]))**3)
+        
+        p = sps.linalg.spsolve(M, rhs)
+        P = p.reshape(n_, n_, order='F')
+
+        phi, y = np.meshgrid(phi, y)
+        return P, y, phi
+
+
+    def Compare_sommerfield(self, epsilon_:float = 0.2) -> float:
+        '''
+        Calculates the sommerfield number with the analytical and numerical solution 
+
+        Args:
+            epsilon (float): The eccentricity ratio
+        
+        Returns:
+            S_a (float): Sommerfield number from analytical solution
+            S_n (float): Sommerfield number from numerical solution
+            phi_analytical (np.ndarray): phi angle from analytical solution
+            phi_numerical (np.ndarray): phi angle from numerical solution
+        '''
+        # Analytical
+        w_x_a = self.eta * self.omega * self.r * self.L**3 / (4 * self.C_p**2) * np.pi * epsilon_ / ((1 - epsilon_**2)**(3/2))
+        w_y_a = self.eta * self.omega * self.r * self.L**3 / (self.C_p**2) * epsilon_**2 / ((1 - epsilon_**2)**(2))
+        self.W = np.sqrt(w_x_a**2 + w_y_a**2)
+        self.sommerfeld()
+        S_a = copy.copy(self.S)
+        phi_analytical = np.arctan(w_y_a / w_x_a)*180/np.pi
+
+        # Numerical
+        P_n, y, phi = self.Numerical(epsilon=epsilon_)
+        
+        d_y = np.abs(y[0,0] - y[1,0])
+        d_phi = np.abs(phi[0,0] - phi[0,1])
+
+        w_x_n = 0
+        w_y_n = 0
+
+        for i in range(len(phi)):
+            for j in range(len(y)):
+                w_x_n = w_x_n + P_n[i,j] * self.r *  np.sin(phi[i,j]) * d_phi * d_y
+                w_y_n = w_y_n + P_n[i,j] * self.r *  np.cos(phi[i,j]) * d_phi * d_y
+        
+        self.W = np.sqrt(w_x_n**2 + w_y_n**2)
+        self.sommerfeld()
+        S_n = copy.copy(self.S)
+        phi_numerical = np.abs(np.arctan(w_y_n / w_x_n)*180/np.pi)
+
+        return S_a, S_n, phi_analytical, phi_numerical
+
 
 
 if __name__ == "__main__":
@@ -472,7 +580,7 @@ if __name__ == "__main__":
         cyl.friction_loss(printbool=True)
 
 
-    if True:
+    if False: # Part 1
         print("Friction Loss")
 
         N = np.linspace(0.1, 120, 500)
@@ -536,3 +644,91 @@ if __name__ == "__main__":
         for i in range(6):
             np.savetxt(f"Assignment2/1-data/friction_{i+1}.txt", np.array([lillen[i], friction[i]]).T)
             np.savetxt(f"Assignment2/1-data/consumption_{i+1}.txt", np.array([lillen[i], consumption[i]]).T)
+
+
+    if False: # Part 2-1
+        Part2 = Bearing()
+        Part2.temp_profile()
+        Part2.get_someya()
+        Part2.someya()
+        Part2.find_temp_visc()
+
+        P_analytical, y, phi = Part2.Analytical()
+
+        plt.figure()
+        ax = plt.axes(projection='3d')
+        ax.plot_surface(y, phi, P_analytical)
+
+        P_nummerical, y, phi = Part2.Numerical()
+
+        plt.figure()
+        ax = plt.axes(projection='3d')
+        ax.plot_surface(y, phi, P_nummerical)
+
+        # Compare the data
+        mse = np.mean((P_analytical - P_nummerical)**2)
+        rmse = np.sqrt(mse)
+        print(f"The RMSE between the analytical and numerical solution is {rmse:.3g}")
+
+        # Correlation
+        corr = np.corrcoef(P_analytical.flatten(), P_nummerical.flatten())[0,1]
+        print(f"The correlation between the analytical and numerical solution is {corr:.3g}")
+
+        # procent Max difference
+        max_diff = np.max(np.abs(P_analytical - P_nummerical))
+        max_val = np.max(np.abs(P_analytical))
+        procent_diff = max_diff / max_val * 100
+        print(f"The maximum difference between the analytical and numerical solution is {procent_diff:.3g}%")
+
+        plt.show()
+
+
+    if True: # Part 2-2
+        Part22 = Bearing()
+        Part22.temp_profile()
+        Part22.get_someya()
+        Part22.someya()
+        Part22.find_temp_visc()
+
+        Phi = np.flip(Part22.Phi_table)
+        Epsilon = Part22.E_table
+        Sommerfeld = Part22.S_table
+        S_analytical = []
+        S_numerical = []
+        Phi_analytical = []
+        Phi_numerical = []
+
+        for i in range(len(Epsilon)):
+            S_a, S_n, phi_a, phi_n = Part22.Compare_sommerfield(epsilon_=Epsilon[i])
+            S_analytical.append(S_a)
+            S_numerical.append(S_n)
+            Phi_analytical.append(phi_a)
+            Phi_numerical.append(phi_n)
+        
+        plt.figure()
+        plt.plot(S_analytical, Phi_analytical, label="Analytical")
+        plt.plot(S_numerical, Phi_numerical, label="Numerical")
+        plt.plot(Sommerfeld, Phi, label="Someya")
+        plt.xlabel("Sommerfeld number")
+        plt.ylabel("Phi [deg]")
+        plt.legend()
+
+        # Save data
+        np.savetxt("Assignment2/2-data/Phi_analytical.txt", np.array([S_analytical, Phi_analytical]).T)
+        np.savetxt("Assignment2/2-data/Phi_numerical.txt", np.array([S_numerical, Phi_numerical]).T)
+        np.savetxt("Assignment2/2-data/Phi.txt", np.array([Sommerfeld, Phi]).T)
+
+        plt.figure()
+        plt.plot(S_analytical, Epsilon, label="Analytical")
+        plt.plot(S_numerical, Epsilon, label="Numerical")
+        plt.plot(Sommerfeld, Epsilon, label="Someya")
+        plt.xlabel("Sommerfeld number")
+        plt.ylabel("Epsilon")
+        plt.legend()
+
+        # Save data
+        np.savetxt("Assignment2/2-data/S_analytical.txt", np.array([S_analytical, Epsilon]).T)
+        np.savetxt("Assignment2/2-data/S_numerical.txt", np.array([S_numerical, Epsilon]).T)
+        np.savetxt("Assignment2/2-data/S.txt", np.array([Sommerfeld, Epsilon]).T)
+
+        plt.show()
