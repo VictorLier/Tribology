@@ -449,7 +449,7 @@ class Bearing:
         y = np.linspace(-self.L/2, self.L/2, n_)
         phi = np.linspace(0, np.pi, n_)
         phi, y = np.meshgrid(phi, y)
-        P = 3 * self.eta * self.omega * epsilon / self.C_p**2 * (self.L**2 / 4 - y**2) * np.sin(phi)/(1 + epsilon * np.cos(phi))**3
+        P = 3 * self.eta * self.omega * epsilon / self.C_p**2 * (self.L**2 / 4 - y**2) * np.sin(phi)/(1 + epsilon * np.cos(phi))**3 # Bogen (10.50) - Hald sommerfeld assumption
         return P, y, phi
 
 
@@ -511,12 +511,12 @@ class Bearing:
             phi_numerical (np.ndarray): phi angle from numerical solution
         '''
         # Analytical
-        w_x_a = self.eta * self.omega * self.r * self.L**3 / (4 * self.C_p**2) * np.pi * epsilon_ / ((1 - epsilon_**2)**(3/2))
-        w_y_a = self.eta * self.omega * self.r * self.L**3 / (self.C_p**2) * epsilon_**2 / ((1 - epsilon_**2)**(2))
-        self.W = np.sqrt(w_x_a**2 + w_y_a**2)
+        w_x_a = self.eta * self.omega * self.r * self.L**3 / (4 * self.C_p**2) * np.pi * epsilon_ / ((1 - epsilon_**2)**(3/2)) # Bogen (10.55) - Remember the different coordinate convention
+        w_y_a = self.eta * self.omega * self.r * self.L**3 / (self.C_p**2) * epsilon_**2 / ((1 - epsilon_**2)**(2)) # Bogen (10.56) - Remember the different coordinate convention
+        self.W = np.sqrt(w_x_a**2 + w_y_a**2) # Bogen (10.57)
         self.sommerfeld()
         S_a = copy.copy(self.S)
-        phi_analytical = np.arctan(w_y_a / w_x_a)*180/np.pi
+        phi_analytical = np.arctan(w_y_a / w_x_a)*180/np.pi # Bogen (10.58)
 
         # Numerical
         P_n, y, phi = self.Numerical(epsilon=epsilon_)
@@ -527,9 +527,10 @@ class Bearing:
         w_x_n = 0
         w_y_n = 0
 
+        # Integrating the pressure distribution to find the load
         for i in range(len(phi)):
             for j in range(len(y)):
-                w_x_n = w_x_n + P_n[i,j] * self.r *  np.sin(phi[i,j]) * d_phi * d_y
+                w_x_n = w_x_n + P_n[i,j] * self.r *  np.sin(phi[i,j]) * d_phi * d_y 
                 w_y_n = w_y_n + P_n[i,j] * self.r *  np.cos(phi[i,j]) * d_phi * d_y
         
         self.W = np.sqrt(w_x_n**2 + w_y_n**2)
@@ -556,7 +557,7 @@ if __name__ == "__main__":
         cyl.friction_loss(printbool=True)
 
 
-    if True: # Part 1 - VG 32
+    if False: # Part 1 - VG 32
         print("Part 1 - VG 32")
 
         start = 0.1
@@ -632,7 +633,6 @@ if __name__ == "__main__":
 
     if False: # Part 2-1
         Part2 = Bearing()
-        Part2.temp_profile()
         Part2.get_someya()
         Part2.someya()
         Part2.find_temp_visc()
@@ -653,10 +653,9 @@ if __name__ == "__main__":
         np.savetxt("Assignment2/2-data/pressure_analytical.txt", np.array([y.flatten('F'), phi.flatten('F'), P_analytical.flatten('F')]).T)
         np.savetxt("Assignment2/2-data/pressure_numerical.txt", np.array([y.flatten('F'), phi.flatten('F'), P_nummerical.flatten('F')]).T)
 
-        # Compare the data
-        mse = np.mean((P_analytical - P_nummerical)**2)
-        rmse = np.sqrt(mse)
-        print(f"The RMSE between the analytical and numerical solution is {rmse:.3g}")
+        # Noramlized Root Mean Square Error (NRMSE) - normalized with the average of the data
+        NRMSE = np.sqrt(np.mean((P_analytical - P_nummerical)**2)) / np.mean(P_analytical)
+        print(f"The NRMSE between the analytical and numerical solution is {NRMSE:.3g}")
 
         # Correlation
         corr = np.corrcoef(P_analytical.flatten(), P_nummerical.flatten())[0,1]
@@ -673,7 +672,6 @@ if __name__ == "__main__":
 
     if False: # Part 2-2
         Part22 = Bearing()
-        Part22.temp_profile()
         Part22.get_someya()
         Part22.someya()
         Part22.find_temp_visc()
