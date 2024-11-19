@@ -48,7 +48,7 @@ class Bearing:
 
         self.mass = Load
         self.W = self.mass * 9.82 # Convert to N
-        self.R_a = surfaceRoughness
+        self.R_a = surfaceRoughness # [m] Bogen (Figure 3.8)
         
         if oil == 0: # ISO VG 32
             self.nu_40 = 32e-6 # [m^2/s] - Kinematic viscosity - ISO 3448
@@ -542,8 +542,8 @@ class Bearing:
 
 
 if __name__ == "__main__":
-    if True: # Test
-        print('test')
+    if False: # Test
+        print('Test')
         cyl = Bearing(surfaceRoughness=1.2e-6, Revolutions=100)
         cyl.get_someya()
         cyl.someya()
@@ -556,10 +556,16 @@ if __name__ == "__main__":
         cyl.friction_loss(printbool=True)
 
 
-    if False: # Part 1
-        print("Friction Loss")
+    if True: # Part 1 - VG 32
+        print("Part 1 - VG 32")
 
-        N = np.linspace(0.01, 500, 100)
+        start = 0.1
+        stop = 200
+        num_points = 500
+
+        Lin_array = np.linspace(0, 1, num_points)
+        N = start + (stop - start) * (Lin_array**2)
+        
         bearings = [[], [], [], [], [], []]
         lillen = [[], [], [], [], [], []]
         friction = [[], [], [], [], [], []]
@@ -576,9 +582,8 @@ if __name__ == "__main__":
         for i in range(6):
             for j in range(len(N)):
                 bearings[i][j].run_all()
-
+            print(f"Finished bearing type {i+1}")
         
-
         for i in range(6):
             hydroflag = True
             stableflag = True
@@ -588,18 +593,21 @@ if __name__ == "__main__":
                     friction[i].append(bearings[i][j].H)
                     consumption[i].append(bearings[i][j].q)
                     lillen[i].append(bearings[i][j].N)
-                elif not bearings[i][j].stable:
+
+                    if hydroflag: # Prints the first time the bearing is not hydrodynamic
+                        print(f"Bearing type {i+1} is hydrodynamic from {N[j]:.3g} Hz")
+                        hydroflag = False
+
+                if not bearings[i][j].stable:
                     if stableflag:
                         print(f"Bearing type {i+1} is unstable from {N[j]:.3g} Hz")
                         stableflag = False
-                elif not bearings[i][j].laminar:
+
+                if not bearings[i][j].laminar:
                     if laminarflag:
                         print(f"Bearing type {i+1} is turbulent from {N[j]:.3g} Hz")
                         laminarflag = False
-                elif bearings[i][j].Hydrodynamic:
-                    if hydroflag:
-                        print(f"Bearing type {i+1} is hydrodynamic from {N[j]:.3g} Hz")
-                        hydroflag = False
+                    
                     
         plt.figure()
         for i in range(6):
