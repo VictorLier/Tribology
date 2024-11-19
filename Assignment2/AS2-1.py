@@ -242,18 +242,13 @@ class Bearing:
 
         for i in range(maxConvergence):
             self.T = T[i]
-            self.temp_relation()
-            self.sommerfeld()
-            Qs = interp1d(self.S_table, self.Q_table, kind='linear', fill_value=(self.Q_table[-1], self.Q_table[0]), bounds_error=False)(self.S) # From table
+            self.temp_relation() # Find viscosity
+            self.sommerfeld() # Find sommerfeld number
+            self.lubrication_consumption() # Finds the forced flow q
 
             f_J = self.psi * interp1d(self.S_table, self.T_table, kind='linear', fill_value=(self.T_table[-1], self.T_table[0]), bounds_error=False)(self.S) # From table
-            epsi = interp1d(self.S_table, self.E_table, kind='linear', fill_value=(self.E_table[-1], self.E_table[0]), bounds_error=False)(self.S) # From table
 
-            h1 = self.C_p - epsi * self.C_b
-            qf = 8 * h1**3 / self.eta * self.pf * self.Qf
-            q = self.r * self.omega * self.C_p * self.L * Qs + qf
-
-            t_new = ((1-lamb) * (f_J * self.r * self.W * self.omega + alpha * A * t_0) + self.CP * self.rho * q * t_1) / (self.CP * self.rho * q + alpha * A * (1-lamb))
+            t_new = ((1-lamb) * (f_J * self.r * self.W * self.omega + alpha * A * t_0) + self.CP * self.rho * self.q * t_1) / (self.CP * self.rho * self.q + alpha * A * (1-lamb))
             T[i+1] = T[i] + 0.1 * (t_new - T[i])
             self.T = T[i+1]
 
@@ -386,30 +381,26 @@ class Bearing:
 
     def lubrication_consumption(self, printbool:bool = False) -> None:
         '''
-        Finds the lubrication consumption of the bearing
+        Finds the lubrication consumption/total oil flow of the bearing
 
         Args:
             printbool (bool): If True, the lubrication consumption is printed
         
         Attributes:
             q (float): Lubrication consumption [m^3/s]
+            q_f (float): Forced flow [m^3/s]
         '''
-        # Qs = np.interp(self.S, self.S_table, self.Q_table)
-        Qs = interp1d(self.S_table, self.Q_table, kind='linear', fill_value='extrapolate')(self.S)
-        # Qe = np.interp(self.S, self.S_table, self.P_table)
-        Qe = interp1d(self.S_table, self.P_table, kind='linear', fill_value='extrapolate')(self.S)
-
-        # epsilon = np.interp(self.S, self.S_table, self.E_table)
-        epsilon = interp1d(self.S_table, self.E_table, kind='linear', fill_value='extrapolate')(self.S)
-
-        h1 = self.C_p - epsilon * self.C_b
-        qf = 8 * h1**3 / self.eta * self.pf * self.Qf
-
-        chi = 1 # Antagelse !!!!!!!!!!!!!!!!
-        self.q = self.r * self.omega * self.C_p * self.L * (Qs + (1 - chi) * Qe) + qf
+        chi = 1 # Assumed worst case Someya (13)
+        Qs = interp1d(self.S_table, self.Q_table, kind='linear', fill_value=(self.Q_table[-1], self.Q_table[0]), bounds_error=False)(self.S) # From table
+        Qe = interp1d(self.S_table, self.P_table, kind='linear', fill_value=(self.P_table[-1], self.P_table[0]), bounds_error=False)(self.S) # From table
+        epsilon = interp1d(self.S_table, self.E_table, kind='linear', fill_value=(self.E_table[-1], self.E_table[0]), bounds_error=False)(self.S) # From table
+        
+        h1 = self.C_p - epsilon * self.C_b  # Film thickness assumed constant - Someya p.6
+        self.q_f = 8 * h1**3 / self.eta * self.pf * self.Qf   # [m^3/s] - Forced flow - Someya (18)
+        self.q = self.r * self.omega * self.C_p * self.L * (Qs + (1 - chi) * Qe) + self.q_f   # [m^3/s] - Someya (20)
 
         if printbool:
-            print(f"The lubrication consumption is {self.q:.3g} m^3/s")
+            print(f"The lubrication consumption is {self.q:.3g} m^3/s and the forced flow is {self.q_f:.3g} m^3/s")
 
 
     def friction_loss(self, printbool:bool = False) -> None:
