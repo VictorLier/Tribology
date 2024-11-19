@@ -20,9 +20,6 @@ m_p = np.array([0, 0, 0.5, 2/3, 0, 0])  # pre load factor [-]
 LD_fac = np.array([0.5,  1.0, 0.5, 1.0, 0.5, 0.5]) # L/D factor [-]
 L = D * LD_fac      # Bearing length [m]
 Cb = (1 - m_p) * Cp # Bearing clearance [m]
-
-# 1. 10*np.pi/180 * R_b = 0.00888: for groove with length L, b/a = 0.18, a/L = 3.5: Qf = 2 * 0.15  
-# 2. 10*np.pi/180 * R_b = 0.00888: for groove with length L, b/a = 0.08, a/L = 1.7: Qf = 2 * 0.15
 Qf = np.array([2 * 0.15, 2*0.15, 2 * 0.15, 2*0.15, 4*0.15, 4*0.15])
 
 # fine milled surfaces
@@ -49,9 +46,11 @@ p_f = 2e5 # [Pa]
 damping = 0.4
 chi = 1 # !
 
+# Calculate the lubricant viscosity
 def eta_i(temp):
     return rho*1e-6*(np.exp(np.exp(-m_lub*np.log(temp+273.15) + k_lub)) - 0.8)
 
+# Calculate the lubricant temperature
 def calculate_lub_temp(j, N, plotswitch):
     t = [50]  # Initial temperature
     omega = 2 * np.pi * N
@@ -66,28 +65,22 @@ def calculate_lub_temp(j, N, plotswitch):
         # Qe = np.interp(S_current, table[:, 0], table[:, 4])
         f_J = psi * np.interp(S_current, table[:, 0], table[:, 5])
         epsi_current = np.interp(S_current, table[:, 0], table[:, 1])
-
         h1 = Cp - epsi_current * Cb[j]
         qf = 8 * h1 ** 3 / eta * pf * Qf[j]
         q = R_b * omega * Cp * L[j] * Qs + qf
-
         t_new = ((1 - lamb) * (f_J * R_b * W * omega + alpha * A * t_0) + cp * rho * q * t_1) / (cp * rho * q + alpha * A * (1 - lamb))
         t.append(t[i] + damping * (t_new - t[i]))
 
         if i > 50:
             t[-1] = np.mean(t[-2:])
             break
-
         if np.abs((t[i + 1] - t[i])/t[i]) < 1e-3:
             break
-        
         i += 1
-    
     lub_temp = t[-1]
     if plotswitch == True:
         plt.plot(np.arange(len(t)), t, label=f'{j + 1}')
         np.savetxt('ASSIGN2_AUST/temp' + str(j) + '.txt', np.array([np.arange(len(t)),t]).T)
-
     return lub_temp
 
 # Example usage: save txt file
@@ -96,7 +89,6 @@ lub_temp = np.zeros(len(Tables))
 for j in range(len(Tables)):
     N = 30
     lub_temp[j] = calculate_lub_temp(j, N, True)
-
 plt.xlabel('Iterations')
 plt.ylabel('Temperature [C]')
 plt.legend()
@@ -110,6 +102,7 @@ print(f"lubricant temperature for bearing 5: {lub_temp[4]:.3f} C and dynamic vis
 print(f"lubricant temperature for bearing 6: {lub_temp[5]:.3f} C and dynamic viscosity: {eta_i(lub_temp[5]):.3f} m^2/s for N = 30 Hz")
 print("##############################################################")
 
+# converged speeds for Re = 1000
 def find_converged_speed(j, target_Re=1000, tol=1e-3, max_iter=100):
     N_low, N_high = 0.1, 1000  # Initial bounds for speed [Hz]
     for _ in range(max_iter):
@@ -126,8 +119,6 @@ def find_converged_speed(j, target_Re=1000, tol=1e-3, max_iter=100):
             N_high = N_mid
 
     return N_mid  # Return the best estimate if convergence is not reached
-
-# eta = np.array([eta_i(calculate_lub_temp(j, 500, )) for j in range(len(Tables))])
 
 # Find converged speeds
 converged_speeds = np.array([find_converged_speed(j) for j in range(len(Tables))])
@@ -157,7 +148,6 @@ for j in range(len(Tables)):
 
     # finding the exact speed where lambda = 10 using interpolation
     N_10 = np.interp(10, Lambda_hydro[:, j], N)
-
     # h_min_10 = 10 * (Rq_a**2 + Rq_b**2)**(1/2)
     # # epsilon_10 = (Cp - h_min_10) / Cb[j]
     # epsilon_10 = 1 - h_min_10 / Cp
@@ -175,6 +165,7 @@ plt.ylim(0, 50)
 plt.axhline(y=10, color='r', linestyle='--')
 plt.show()
 
+# save the data
 np.savetxt('ASSIGN2_AUST/Nmin1.txt', np.array([N, Lambda_hydro[:,0]]).T)
 np.savetxt('ASSIGN2_AUST/Nmin2.txt', np.array([N, Lambda_hydro[:,1]]).T)
 np.savetxt('ASSIGN2_AUST/Nmin3.txt', np.array([N, Lambda_hydro[:,2]]).T)
@@ -184,8 +175,7 @@ np.savetxt('ASSIGN2_AUST/Nmin6.txt', np.array([N, Lambda_hydro[:,5]]).T)
 
 print("##############################################################")
 
-# 2) Find maximum angular velocity
-
+# 2) Find maximum angular velocity - determine the speed at which the system becomes unstable
 N = np.linspace(10, 2000, 1000)        # Speed [Hz]
 M = np.array([[mass/2, 0], [0, mass/2]])    # mass matrix
 eigen_RE1 = np.zeros((len(N), 6))
@@ -193,9 +183,7 @@ eigen_RE2 = np.zeros((len(N), 6))
 eigen_RE3 = np.zeros((len(N), 6))
 eigen_RE4 = np.zeros((len(N), 6))
 eigen = np.zeros((len(N), 6, 4))
-
 N_stability = np.zeros(6)
-
 for j in range(len(Tables)):
     eigenswitch = 0
     table = np.flip(Tables[j], axis = 0)
@@ -236,8 +224,6 @@ for j in range(len(Tables)):
         eigen_RE3[i, j] = np.real(s[2])
         eigen_RE4[i, j] = np.real(s[3])
         eigen[i, j, :] = np.real(s)
-
-
 
         if np.any(np.real(s) > 0) and eigenswitch == 0:         # if eigenvalues s have positive real part, the system is unstable
             eigenswitch = 1
@@ -281,56 +267,23 @@ plt.xlabel('Speed [Hz]')
 plt.ylabel('Real part of eigenvalues')
 plt.ylim(-100, 100)
 plt.legend(['1', '2', '3', '4', '5', '6'])
-
 plt.show()
 
 plt.figure()
-# plt.plot(N, eigen_RE1[:,0], label='1')
-# plt.plot(N, eigen_RE1[:,1], label='2')
-# plt.plot(N, eigen_RE1[:,2], label='3')
-# plt.plot(N, eigen_RE1[:,3], label='4')
-# plt.plot(N, eigen_RE1[:,4], label='5')
-# plt.plot(N, eigen_RE1[:,5], label='6')
-
-# plt.plot(N, eigen_RE2[:,0])
-# plt.plot(N, eigen_RE2[:,1])
-# plt.plot(N, eigen_RE2[:,2])
-# plt.plot(N, eigen_RE2[:,3])
-# plt.plot(N, eigen_RE2[:,4])
-# plt.plot(N, eigen_RE2[:,5])
-
-# plt.plot(N, eigen_RE3[:,0])
-# plt.plot(N, eigen_RE3[:,1])
-# plt.plot(N, eigen_RE3[:,2])
-# plt.plot(N, eigen_RE3[:,3])
-# plt.plot(N, eigen_RE3[:,4])
-# plt.plot(N, eigen_RE3[:,5])
-
-# plt.plot(N, eigen_RE4[:,0])
-# plt.plot(N, eigen_RE4[:,1])
-# plt.plot(N, eigen_RE4[:,2])
-# plt.plot(N, eigen_RE4[:,3])
-# plt.plot(N, eigen_RE4[:,4])
-# plt.plot(N, eigen_RE4[:,5])
-
 plt.plot(N, eigen[:,0,:], color = 'b', label='1')
 plt.plot(N, eigen[:,1,:], color = 'orange', label='2')
 plt.plot(N, eigen[:,2,:], color = 'g', label='3')
 plt.plot(N, eigen[:,3,:], color = 'r', label='4')
 plt.plot(N, eigen[:,4,:], color = 'purple', label='5')
 plt.plot(N, eigen[:,5,:], color = 'brown', label='6')
-
 plt.legend()
-
-# plt.plot(N, eigen_RE2)
-# plt.plot(N, eigen_RE3)
-# plt.plot(N, eigen_RE4)
 plt.xlabel('Speed [Hz]')
 plt.ylabel('Real part of eigenvalues')
 plt.hlines(0, 0, 2000, colors='r', linestyles='--')
 plt.ylim(-100, 100)
 plt.show()
 
+# save the data
 for i in range(6):
     for k in range(4):
         # remove datapoints from eigen that are above 100 and below -100, and make a N that matches the new eigen
@@ -339,7 +292,6 @@ for i in range(6):
         np.savetxt(f'ASSIGN2_AUST/eigen{i+1}{k+1}.txt', np.array([Np[::2], eigenp[::2]]).T)
 
 # 3) maximum lubrications consumptions (flow rate)
-
 for j in range(len(Tables)):
     N_max = np.min([converged_speeds[j], N_stability[j]])
     if N_max > 500:
@@ -368,7 +320,6 @@ plt.legend(['1', '2', '3', '4', '5', '6'])
 plt.show()
 
 # 4) maximum friction loss 
-
 for j in range(len(Tables)):
     N_max = np.min([converged_speeds[j], N_stability[j]])
     if N_max > 500:

@@ -13,8 +13,7 @@ Cp = 102e-6         # Clearance      [m]
 W = mass*9.82/2     # Load           [N]
 psi = Cp/R_b        # Eccentricity ratio
 pf = 1e5            # Feed pressure  [N]
-
-m_p = 0
+m_p = 0 
 LD_fac = 0.5
 L = D * LD_fac      # Bearing length [m]
 Cb = (1 - m_p) * Cp # Bearing clearance [m]
@@ -40,14 +39,15 @@ p_f = 2e5 # [Pa]
 damping = 0.4
 chi = 1 # !
 
+# Calculate the lubricant viscosity
 def eta_i(temp):
     return rho*1e-6*(np.exp(np.exp(-m_lub*np.log(temp+273.15) + k_lub)) - 0.8)
 
+# Calculate the lubricant temperature
 def calculate_lub_temp(N):
     t = [50]  # Initial temperature
     omega = 2 * np.pi * N
     table = np.flip(Table1, axis=0)
-    
     i = 0
     while True:
         eta = eta_i(t[i])
@@ -55,28 +55,19 @@ def calculate_lub_temp(N):
         Qs = np.interp(S_current, table[:, 0], table[:, 3])
         f_J = psi * np.interp(S_current, table[:, 0], table[:, 5])
         epsi_current = np.interp(S_current, table[:, 0], table[:, 1])
-
         h1 = Cp - epsi_current * Cb
         qf = 8 * h1 ** 3 / eta * pf * Qf
         q = R_b * omega * Cp * L * Qs + qf
-
         t_new = ((1 - lamb) * (f_J * R_b * W * omega + alpha * A * t_0) + cp * rho * q * t_1) / (cp * rho * q + alpha * A * (1 - lamb))
         t.append(t[i] + damping * (t_new - t[i]))
 
         if i > 50:
             t[-1] = np.mean(t[-2:])
             break
-
         if np.abs((t[i + 1] - t[i])/t[i]) < 1e-3:
             break
-        
         i += 1
-    
-    lub_temp = t[-1]
-
-    return lub_temp
-
-
+    return t[-1]
 
 b = 50.8e-3
 C = 102e-6 
@@ -86,7 +77,7 @@ print(eta_0)
 omega_b = N * 2 * np.pi
 R_b = 50.902e-3
 
-
+# Calculate analytical pressure distribution
 def analytical(nx, epsilon):
     phi = np.linspace(0, np.pi, nx)
     y = np.linspace(-b/2, b/2, nx)
@@ -94,6 +85,7 @@ def analytical(nx, epsilon):
     p = 3 * eta_0 * omega_b * epsilon / C**2 * (b**2/4 - y**2) * np.sin(phi)/(1+epsilon*np.cos(phi))**3
     return phi, y, p
 
+# Calculate numerical pressure distribution
 def finite_difference(nx, epsilon):
     phi = np.linspace(0, np.pi, nx)
     y = np.linspace(-b/2, b/2, nx)
@@ -130,9 +122,11 @@ def finite_difference(nx, epsilon):
     phi, y = np.meshgrid(phi, y)
     return phi, y, p2
 
-nx_test = 40
-epsilon_test = 0.3
+# Plot the pressure distribution
+nx_test = 50
+epsilon_test = 0.8
 
+# Plotting numerical solution
 phi, y, p2 = finite_difference(nx_test,epsilon_test)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -142,6 +136,7 @@ ax.set_ylabel('y [mm]')
 ax.set_zlabel('Pressure $p$ [MPa]')
 ax.view_init(elev=30, azim=-120)  # Change the elevation and azimuth to adjust the orientation
 
+# Plotting analytical solution
 phi, y, p = analytical(nx_test,epsilon_test)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -150,8 +145,16 @@ ax.set_xlabel('$\phi$ [deg]')
 ax.set_ylabel('y [mm]')
 ax.set_zlabel('Pressure $p$ [MPa]')
 ax.view_init(elev=30, azim=-120)  # Change the elevation and azimuth to adjust the orientation
-
 plt.show()
+plt.show()
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+surf = ax.plot_surface(phi*180/np.pi, y*1e3, (p-p2)*1e-3, cmap='viridis', edgecolor='none')
+ax.set_xlabel('$\phi$ [deg]')
+ax.set_ylabel('y [mm]')
+ax.set_zlabel('Pressure difference [kPa]')
+ax.view_init(elev=30, azim=-120)  # Change the elevation and azimuth to adjust the orientation
 plt.show()
 
 # calculating a mean sum squared error between the analytical and numerical solution
@@ -159,23 +162,13 @@ def squared_error(nx, epsilon):
     phi, y, p2 = finite_difference(nx, epsilon)
     phi, y, p = analytical(nx, epsilon)
     return np.mean((p2-p)**2)
-
 print(f"Mean squared error between analytical and numerical solution: {squared_error(nx_test, epsilon_test):.3g}")
-
-
-# np.savetxt('W5/data/pressureDistributionShroudHeight.txt', np.array([X.flatten('F'), Y.flatten('F'), h.flatten('F')]).T)
-# if printbol:
-#     self.F2 = np.trapezoid(np.trapezoid(self.p2, self.X), self.Y)
-#     print(f"The load capacity is: {self.F2:.3g} N")
-
-# Q2
 
 Phi_a, S_a = [], []
 Phi_n, S_n = [], []
 
 Table1 = np.flip(Table1, axis=0)
 epsilon_table = Table1[:,1]
-
 for epsi in Table1[:,1]:
     # analytical results
     w_x_a = eta_0 * omega_b * R_b * b**3 / (4 * C**2) * np.pi*epsi / ((1-epsi**2)**(3/2))
@@ -184,7 +177,7 @@ for epsi in Table1[:,1]:
     S_a.append(np.interp(Phi_a[-1], Table1[:,2], Table1[:,0]))
 
     # numerical results
-    nx_number = 25
+    nx_number = 50
     phi, y, p2 = finite_difference(nx_number,epsi)
     dphi = abs(phi[0,0] - phi[0,1])
     dy = abs(y[0,0] - y[1,0])
@@ -211,6 +204,7 @@ print("Table of Sommerfeld numbers; epsilon, S, S_a, %error_a, S_n, %error_n")
 print(table)
 print(f"Mean error for S_a: {np.mean(table[:,2]):.3f} and for S_n: {np.mean(table[:,4]):.3f}")
 
+# Plotting the results
 plt.figure()
 plt.plot(epsilon_table, S_a, label='Analytical')
 plt.plot(epsilon_table, S_n, label='Numerical')
@@ -227,9 +221,9 @@ plt.xlabel('epsilon')
 plt.ylabel('Phi')
 plt.legend()
 plt.show()
-
 plt.show()
 
+# Save the results
 np.savetxt('ASSIGN2_AUST/Sa.txt', np.array([epsilon_table, S_a]).T)
 np.savetxt('ASSIGN2_AUST/Sn.txt', np.array([epsilon_table, S_n]).T)
 np.savetxt('ASSIGN2_AUST/Sbench.txt', np.array([epsilon_table, Table1[:,0]]).T)
