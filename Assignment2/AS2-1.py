@@ -263,7 +263,7 @@ class Bearing:
 
                 if printbool:
                     print(f"The sommerfeld number is {self.S:.3g}")
-                    print(f"The temperature of the oil is {self.T:.5g} K and the kinematic viscosity is {self.nu:.5g} m^2/s - Found in {i} iterations")
+                    print(f"The temperature of the oil is {self.T:.5g} C and the kinematic viscosity is {self.nu:.5g} m^2/s and the absolute viscosity is {self.eta:.5g} - Found in {i} iterations")
 
                 break
 
@@ -276,7 +276,7 @@ class Bearing:
             plt.figure()
             plt.plot(iteration, T)
             plt.xlabel("Iteration")
-            plt.ylabel("Temperature [K]")
+            plt.ylabel("Temperature [C]")
             plt.title("Temperature convergence")
             plt.show()
 
@@ -293,10 +293,7 @@ class Bearing:
             Re (float): Reynolds number
             laminar (bool): If True, the flow is laminar
         '''
-        # self.Re = self.C_p * self.U / self.nu # Someya (XIII)
-
-        self.Re = self.rho * self.omega * self.C_p * self.r / self.eta
-
+        self.Re = self.C_p * self.U / self.nu # Someya (XIII)
 
         if self.Re < laminarRE:
             self.laminar = True
@@ -317,9 +314,9 @@ class Bearing:
         Attributes:
             h_min (float): Minimum film thickness
         '''
-        epsilon = interp1d(self.S_table, self.E_table, kind='linear', fill_value='extrapolate')(self.S)
+        epsilon = interp1d(self.S_table, self.E_table, kind='linear', fill_value=(self.E_table[-1], self.E_table[0]), bounds_error=False)(self.S) # From table
 
-        self.h_min = self.C_p * (1 - epsilon)
+        self.h_min = self.C_p * (1 - epsilon) # Someya (8)
 
         if printbool:
             print(f"The minimum film thickness is {self.h_min:.3g} m")
@@ -358,7 +355,8 @@ class Bearing:
         Attributes:
             stable (bool): If True, the bearing is stable
         '''
-        kxx = interp1d(self.S_table, self.kx_table, kind='linear', fill_value=(self.kx_table[-1], self.kx_table[0]), bounds_error=False)(self.S) * self.W / self.C_p
+        # Data is in non-dimensional form - Someya (1.4.2). The data is interpolated to the current Sommerfeld number and converted to dimensional form
+        kxx = interp1d(self.S_table, self.kx_table, kind='linear', fill_value=(self.kx_table[-1], self.kx_table[0]), bounds_error=False)(self.S)    * self.W / self.C_p
         kxy = interp1d(self.S_table, self.kxy_table, kind='linear', fill_value=(self.kxy_table[-1], self.kxy_table[0]), bounds_error=False)(self.S) * self.W / self.C_p
         kyx = interp1d(self.S_table, self.kyx_table, kind='linear', fill_value=(self.kyx_table[-1], self.kyx_table[0]), bounds_error=False)(self.S) * self.W / self.C_p
         kyy = interp1d(self.S_table, self.kyy_table, kind='linear', fill_value=(self.kyy_table[-1], self.kyy_table[0]), bounds_error=False)(self.S) * self.W / self.C_p
@@ -368,17 +366,14 @@ class Bearing:
         Byy = interp1d(self.S_table, self.Byy_table, kind='linear', fill_value=(self.Byy_table[-1], self.Byy_table[0]), bounds_error=False)(self.S) * self.W / (self.omega * self.C_p)
 
 
-        M = np.array([[self.mass, 0], [0, self.mass]])
-        K = np.array([[kxx, kxy], [kyx, kyy]])
-        B = np.array([[Bxx, Bxy], [Byx, Byy]])
+        M = np.array([[self.mass, 0], [0, self.mass]])  # Slides 9 - 7
+        K = np.array([[kxx, kxy], [kyx, kyy]])      # Slides 9 - 7
+        B = np.array([[Bxx, Bxy], [Byx, Byy]])    # Slides 9 - 7
 
-        A1 = np.block([[M, np.zeros((2,2))], [np.zeros((2,2)), M]])
-        A2 = np.block([[K, B], [-M, np.zeros(M.shape)]])
+        A1 = np.block([[M, np.zeros((2,2))], [np.zeros((2,2)), M]])     # Slides 9 - 7
+        A2 = np.block([[B, K], [-M, np.zeros(M.shape)]])    # Slides 9 - 7
 
         s, u = eig(-A2, A1)
-
-        xi = -np.real(s) / np.abs(s)
-        wd_hz = np.imag(s) / (2*np.pi)
 
         if np.any(np.real(s) > 0):
             self.stable = False
@@ -562,16 +557,16 @@ class Bearing:
 if __name__ == "__main__":
     if True: # Test
         print('test')
-        cyl = Bearing(surfaceRoughness=1.2e-6, Revolutions=0.5)
+        cyl = Bearing(surfaceRoughness=1.2e-6, Revolutions=100)
         cyl.get_someya()
         cyl.someya()
-        cyl.find_temp_visc(printbool=True, plot=True)
+        cyl.find_temp_visc(printbool=True, plot=False)
         cyl.reynolds_number(printbool=True)
         cyl.minimum_film_thickness(printbool=True)
         cyl.film_parameter(printbool=True)
         cyl.stability(printbool=True)
-        # cyl.lubrication_consumption(printbool=True)
-        # cyl.friction_loss(printbool=True)
+        cyl.lubrication_consumption(printbool=True)
+        cyl.friction_loss(printbool=True)
 
 
     if False: # Part 1
