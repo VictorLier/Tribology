@@ -218,7 +218,7 @@ class Bearing:
             maxConvergence (int): The maximum number of iterations
 
         Attributes:
-            T (float): The temperature of the oil in the bearing
+            T (float): The temperature of the oil in the bearing [C]
             nu (float): The kinematic viscosity of the oil in the bearing
         
         Raises:
@@ -245,10 +245,9 @@ class Bearing:
             self.temp_relation() # Find viscosity
             self.sommerfeld() # Find sommerfeld number
             self.lubrication_consumption() # Finds the forced flow q
+            self.friction_loss() # Finds the friction loss H
 
-            f_J = self.psi * interp1d(self.S_table, self.T_table, kind='linear', fill_value=(self.T_table[-1], self.T_table[0]), bounds_error=False)(self.S) # From table
-
-            t_new = ((1-lamb) * (f_J * self.r * self.W * self.omega + alpha * A * t_0) + self.CP * self.rho * self.q * t_1) / (self.CP * self.rho * self.q + alpha * A * (1-lamb))
+            t_new = ((1-lamb) * (self.H + alpha * A * t_0) + self.CP * self.rho * self.q * t_1) / (self.CP * self.rho * self.q + alpha * A * (1-lamb))  # [C] - Someya (32)
             T[i+1] = T[i] + 0.1 * (t_new - T[i])
             self.T = T[i+1]
 
@@ -413,9 +412,8 @@ class Bearing:
         Attributes:
             H (float): Friction loss [W]
         '''
-        # fj = np.interp(self.S, self.S_table, self.T_table) * self.psi
-        fj = interp1d(self.S_table, self.T_table, kind='linear', fill_value='extrapolate')(self.S) * self.psi
-        self.H = fj * self.r * self.W * self.omega
+        f_j = self.psi * interp1d(self.S_table, self.T_table, kind='linear', fill_value=(self.T_table[-1], self.T_table[0]), bounds_error=False)(self.S) # From table - psi have to be used as the data i f_J / psi
+        self.H = f_j * self.r * self.W * self.omega # [W] - Someya (22)
 
         if printbool:
             print(f"The friction loss is {self.H:.3g} W")
@@ -427,14 +425,12 @@ class Bearing:
         '''
         self.get_someya()
         self.someya()
+        self.temp_constants()
         self.find_temp_visc()
-        self.sommerfeld()
         self.reynolds_number()
         self.minimum_film_thickness()
         self.film_parameter()
         self.stability()
-        self.lubrication_consumption()
-        self.friction_loss()
 
 
     def Analytical(self, n_:int = 10, epsilon:float = 0.2) -> list:
