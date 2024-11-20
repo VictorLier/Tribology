@@ -632,12 +632,12 @@ if __name__ == "__main__":
     if True: # Part 1 - VG 46
         print("Part 1 - VG 46")
 
-        start = 0.1
-        stop = 200
+        start = 90
+        stop = 5000
         num_points = 500
 
         Lin_array = np.linspace(0, 1, num_points)
-        N = start + (stop - start) * (Lin_array**2)
+        N = start + (stop - start) * (Lin_array**1)
         
         bearings = [[], [], [], [], [], []]
         lillen = [[], [], [], [], [], []]
