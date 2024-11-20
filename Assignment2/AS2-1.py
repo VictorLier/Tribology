@@ -138,8 +138,6 @@ class Bearing:
             P (np.ndarray): 
             T (np.ndarray):
         '''
-        # self.table = np.flip(self.table, axis=0)
-
         self.S_table = self.table[:,0]     # Sommerfeld number
         self.E_table = self.table[:,1]     # eccentricity ratio
         self.Phi_table = self.table[:,2]   # attitude angle (deg)
