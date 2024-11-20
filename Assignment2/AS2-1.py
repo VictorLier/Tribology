@@ -447,7 +447,7 @@ class Bearing:
         y = np.linspace(-self.L/2, self.L/2, n_)
         phi = np.linspace(0, np.pi, n_)
         phi, y = np.meshgrid(phi, y)
-        P = 3 * self.eta * self.omega * epsilon / self.C_p**2 * (self.L**2 / 4 - y**2) * np.sin(phi)/(1 + epsilon * np.cos(phi))**3 # Bogen (10.50) - Hald sommerfeld assumption
+        P = 3 * self.eta * self.omega * epsilon / self.C_p**2 * (self.L**2 / 4 - y**2) * np.sin(phi)/(1 + epsilon * np.cos(phi))**3 # Bogen (10.50) - Half sommerfeld assumption
         return P, y, phi
 
 
@@ -629,6 +629,80 @@ if __name__ == "__main__":
             np.savetxt(f"Assignment2/1-data/consumption_{i+1}.txt", np.array([lillen[i], consumption[i]]).T)
 
 
+    if True: # Part 1 - VG 46
+        print("Part 1 - VG 46")
+
+        start = 0.1
+        stop = 200
+        num_points = 500
+
+        Lin_array = np.linspace(0, 1, num_points)
+        N = start + (stop - start) * (Lin_array**2)
+        
+        bearings = [[], [], [], [], [], []]
+        lillen = [[], [], [], [], [], []]
+        friction = [[], [], [], [], [], []]
+        consumption = [[], [], [], [], [], []]
+
+        for n in N:
+            bearings[0].append(Bearing(bearingtype=0, LengthDiameterFactor=0.5, preLoadFactor=0, Revolutions=n, oil=1))
+            bearings[1].append(Bearing(bearingtype=0, LengthDiameterFactor=1, preLoadFactor=0, Revolutions=n, oil=1))
+            bearings[2].append(Bearing(bearingtype=1, LengthDiameterFactor=0.5, preLoadFactor=0.5, Revolutions=n, oil=1))
+            bearings[3].append(Bearing(bearingtype=1, LengthDiameterFactor=1, preLoadFactor=2/3, Revolutions=n, oil=1))
+            bearings[4].append(Bearing(bearingtype=2, LengthDiameterFactor=0.5, preLoadFactor=0, PadLoes=0, Revolutions=n, oil=1))
+            bearings[5].append(Bearing(bearingtype=2, LengthDiameterFactor=0.5, preLoadFactor=0, PadLoes=1, Revolutions=n, oil=1))
+
+        for i in range(6):
+            for j in range(len(N)):
+                bearings[i][j].run_all()
+            print(f"Finished bearing type {i+1}")
+        
+        for i in range(6):
+            hydroflag = True
+            stableflag = True
+            laminarflag = True
+            for j in range(len(N)):
+                if bearings[i][j].Hydrodynamic and bearings[i][j].stable and bearings[i][j].laminar:
+                    friction[i].append(bearings[i][j].H)
+                    consumption[i].append(bearings[i][j].q)
+                    lillen[i].append(bearings[i][j].N)
+
+                    if hydroflag: # Prints the first time the bearing is not hydrodynamic
+                        print(f"Bearing type {i+1} is hydrodynamic from {N[j]:.3g} Hz")
+                        hydroflag = False
+
+                if not bearings[i][j].stable:
+                    if stableflag:
+                        print(f"Bearing type {i+1} is unstable from {N[j]:.3g} Hz")
+                        stableflag = False
+
+                if not bearings[i][j].laminar:
+                    if laminarflag:
+                        print(f"Bearing type {i+1} is turbulent from {N[j]:.3g} Hz")
+                        laminarflag = False
+                    
+                    
+        plt.figure()
+        for i in range(6):
+            plt.plot(lillen[i], friction[i], label=f"Bearing type {i+1}")
+        plt.xlabel("Revolutions [Hz]")
+        plt.ylabel("Friction loss [W]")
+        plt.legend()
+
+        plt.figure()
+        for i in range(6):
+            plt.plot(lillen[i], consumption[i], label=f"Bearing type {i+1}")
+        plt.xlabel("Revolutions [Hz]")
+        plt.ylabel("Lubrication consumption [m^3/s]")
+        plt.legend()
+        plt.show()
+
+        # Save data
+        for i in range(6):
+            np.savetxt(f"Assignment2/1-data/friction_{i+1}_46.txt", np.array([lillen[i], friction[i]]).T)
+            np.savetxt(f"Assignment2/1-data/consumption_{i+1}_46.txt", np.array([lillen[i], consumption[i]]).T)
+
+
     if False: # Part 2-1
         Part2 = Bearing()
         Part2.get_someya()
@@ -647,9 +721,17 @@ if __name__ == "__main__":
         ax = plt.axes(projection='3d')
         ax.plot_surface(y, phi, P_nummerical)
 
+        
         # Save data
         np.savetxt("Assignment2/2-data/pressure_analytical.txt", np.array([y.flatten('F'), phi.flatten('F'), P_analytical.flatten('F')]).T)
         np.savetxt("Assignment2/2-data/pressure_numerical.txt", np.array([y.flatten('F'), phi.flatten('F'), P_nummerical.flatten('F')]).T)
+
+        # Compare total load
+        total_load_analytical = np.sum(P_analytical)
+        total_load_numerical = np.sum(P_nummerical)
+        # procent difference
+        procent_diff = np.abs(total_load_numerical - total_load_analytical) / total_load_analytical * 100
+        print(f"The total load difference between the analytical and numerical solution is {procent_diff:.3g}%")
 
         # Noramlized Root Mean Square Error (NRMSE) - normalized with the average of the data
         NRMSE = np.sqrt(np.mean((P_analytical - P_nummerical)**2)) / np.mean(P_analytical)
