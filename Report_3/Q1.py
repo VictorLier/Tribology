@@ -186,18 +186,20 @@ np.savetxt("Report_3/data/Q2_po.txt", np.array([x_extended*1e6, p_extended*1e-9]
 # 5) ------------------------------------------------------------------
 
 d_o = 85.51e-3    # [m] - Outer race diameter
-
 c_d = d_o - d_i - 2*d # Eq. 21.2
 print(f"Clearance: {c_d*1e6:.2f} um")
 
+r_bx = np.array([d_i/2, -d_o/2])
+R_x = ( 1 / r_ax + 1 / r_bx )**(-1) # Eq. 17.4
+W_mark = w_zmark / (E_mark * R_x) # Eq. 17.38
 delta_m = 2*W_mark*R_x / np.pi * (np.log(2*np.pi/W_mark) - 1) # Eq. 17.39
-
-
 
 Z_w_top = np.pi * ( 1 - c_d / (2*delta_m) )**(3/2)
 Z_w_bottom = 2.491 * ( np.sqrt( 1 + (( 1 - c_d / (2*delta_m) ) / 1.23 )**2) - 1) 
 Z_w = Z_w_top / Z_w_bottom # Eq. 21.46
 
 w_z_clearance = n * w_z_max / Z_w # Eq. 21.44
-print(f"Load with clearance: {w_z_clearance*1e-3:.2f} kN")
-print(f"Using Z_w: {Z_w:.2f}")
+print(f"Load with clearance for inner: {w_z_clearance[0]*1e-3:.2f} kN")
+print(f"Load with clearance for outer: {w_z_clearance[1]*1e-3:.2f} kN")
+print(f"Using Z_w for inner: {Z_w[0]:.2f}")
+print(f"Using Z_w for outer: {Z_w[1]:.2f}")
