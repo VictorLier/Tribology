@@ -5,7 +5,7 @@ class Bearing:
     '''
     Cylindrical bearing class for Assignment 3
     '''
-    def __init__(self, InnerRaceDia:float=69.5e-3, OuterRaceDia:float=85.5e-3, RollerDia:float=8e-3, RollerLength:float=8e-3, NoOfRollers:int=20, MaxLoad:float=8000, InnerRaceSpeed:float=837, OuterRaceSpeed:float=0, EModulus:float=207e9, PoissonRatio:float=0.3, AbsoluteViscosity:float=0.01, PressViscCoef:float=2e-8)->None:
+    def __init__(self, InnerRaceDia:float=69.5e-3, OuterRaceDia:float=85.5e-3, RollerDia:float=8e-3, RollerLength:float=8e-3, NoOfRollers:int=20, MaxLoad:float=8000, InnerRaceSpeed:float=837, OuterRaceSpeed:float=0, EModulus:float=210e9, PoissonRatio:float=0.3, AbsoluteViscosity:float=0.01, PressViscCoef:float=2e-8)->None:
         '''
         Creates a new instance of the Bearing class with the given parameters.
 
@@ -30,8 +30,8 @@ class Bearing:
             l (float) [m] - Length of the rollers
             i (int) - Number of rollers
             w_z (float) [N] - Maximum radial load
-            omega_i (float) [rad/s] - Angular velocity of
-            omega_o (float) [rad/s] - Angular velocity of
+            omega_i (float) [rad/s] - Angular velocity of inner race
+            omega_o (float) [rad/s] - Angular velocity of outer race
             E (float) [Pa] - Young's Modulus
             nu (float) - Poisson's ratio
             eta_0 (float) [Pa s] - Base absolute viscosity of the lubricant
@@ -79,7 +79,7 @@ class Bearing:
         
         Args:
             printbool (bool) - Prints the minimum film thickness if True
-            Lambda (float) - Non-dimensional film parameter (default: 3) - Lowest in the EHL regime
+            Lambda (float) - Non-dimensional film parameter (default: 3) - Lowest in the EHL regime - p. 57
 
         Attributes:
             h_min (float) [m] - Minimum film thickness
@@ -90,7 +90,7 @@ class Bearing:
         self.Lambda = Lambda
         R_at = 0.3e-6 # Worst case from figure 3.8
         R_ar = 0.12e-6 # Worst case from figure 3.8
-        self.R_qt = R_at * 1.11 # (3.5
+        self.R_qt = R_at * 1.11 # (3.5)
         self.R_qr = R_ar * 1.11 # (3.5)
 
         self.h_min = self.Lambda * (self.R_qt**2 + self.R_qr**2)**0.5 # (3.22)
@@ -273,6 +273,55 @@ class Bearing:
             print(f'Maximum elastic deformation: delta_m = {self.delta_m:.4g} m')
 
 
+    def rectangular_dimensionless_load(self, printbool:bool=False)->None:
+        '''
+        Calculates the dimensionless load and load per unit width of rectangular contact
+        
+        Args:
+            printbool (bool) - Prints the contact semi-width if True
+        
+        Attributes:
+            W_prime (float) - dimensionless load
+            w_x_prime (float) [N/m] - load per unit width
+        '''
+        self.w_x_prime = self.w_zm / self.l # (p. 448)
+        self.W_prime = self.w_x_prime / (self.E_prime * self.R_x)   # (17.38)
+
+        if printbool:
+            print(f'Dimensionless load: W_prime = {self.W_prime:.4g}')
+            print(f'Load per unit width: w_x_prime = {self.w_x_prime:.4g} N/m')
+    
+    def rectangular_max_deformation(self, printbool:bool=False)->None:
+        '''
+        Calculates the maximum elastic deformation of the rectangular contact
+        
+        Args:
+            printbool (bool) - Prints the maximum elastic deformation if True
+        
+        Attributes:
+            delta_m (float) [m] - Maximum elastic deformation
+        '''
+        self.delta_m = 2 * self.W_prime * self.R_x / np.pi * (np.log(2 * np.pi/self.W_prime) - 1) # (17.39)
+
+        if printbool:
+            print(f'Maximum elastic deformation: delta_m = {self.delta_m:.4g} m')
+
+
+    def rectangular_max_pressure(self, printbool:bool=False)->None:
+        '''
+        Calculates the maximum contact pressure of the rectangular contact
+        
+        Args:
+            printbool (bool) - Prints the maximum contact pressure if True
+        
+        Attributes:
+            p_m (float) [Pa] - Maximum contact pressure
+        '''
+        self.p_m = self.E_prime * (self.W_prime/(2 * np.pi))**(1/2) # (17.40)
+
+        if printbool:
+            print(f'Maximum contact pressure: p_m = {self.p_m:.4g} Pa')
+
 
 if __name__ == '__main__':
     if False: # Test
@@ -289,16 +338,12 @@ if __name__ == '__main__':
     if True: # Question 2
         print('Question 2')
         Q2 = Bearing()
-        Q2.max_load(printbool=True)
+        Q2.max_load()
         Q2.effective_radius(printbool=True)
-        Q2.curvature(printbool=True)
-        Q2.ellipticity_parameter(printbool=True, plotbool=True)
         Q2.effective_elastic_modulus(printbool=True)
-        Q2.diameter_contact(printbool=True)
-        Q2.maximum_pressure(printbool=True)
-        Q2.maximum_deform(printbool=True)
-
-        plt.show()        
+        Q2.rectangular_dimensionless_load(printbool=True)
+        Q2.rectangular_max_deformation(printbool=True)
+        Q2.rectangular_max_pressure(printbool=True)    
 
 
 
