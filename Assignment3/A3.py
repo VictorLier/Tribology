@@ -216,7 +216,7 @@ class Bearing:
         Attributes:
             E_prime (float) [Pa] - Effective elastic modulus
         '''
-        self.E_prime = 2 / ( (1-self.nu**2) / self.E + (1-self.nu**2) / self.E ) # (17.17)
+        self.E_prime = 2 / (2 * (1-self.nu**2) / self.E ) # (17.17)
 
         if printbool:
             print(f'Effective elastic modulus: E_prime = {self.E_prime:.4g} Pa')
@@ -328,7 +328,7 @@ if __name__ == '__main__':
         bearing = Bearing()
 
 
-    if False: # Question 1
+    if True: # Question 1
         print('Question 1')
         Q1 = Bearing()
         Q1.max_load(printbool=True)
