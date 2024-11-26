@@ -216,7 +216,7 @@ class Bearing:
         Attributes:
             E_prime (float) [Pa] - Effective elastic modulus
         '''
-        self.E_prime = 2 / (2 * (1-self.nu**2) / self.E ) # (17.17)
+        self.E_prime = 1 / ( (1-self.nu**2) / self.E ) # (17.17)
 
         if printbool:
             print(f'Effective elastic modulus: E_prime = {self.E_prime:.4g} Pa')
