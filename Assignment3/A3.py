@@ -110,9 +110,6 @@ class Bearing:
         self.R_x = (self.r_ax * self.r_bx) / (self.r_ax + self.r_bx) # (17.4)
         self.R_y = (self.r_ay * self.r_by) / (self.r_ay + self.r_by) # (17.5)
 
-        # self.R_x = np.nan_to_num(self.R_x, nan=np.inf)  # Replace nan with inf
-        # self.R_y = np.nan_to_num(self.R_y, nan=np.inf)  # Replace nan with inf
-
         if printbool:
             print(f'Effective radius for inner track in x: R_xi = {self.R_x[0]:.3g} m')
             print(f'Effective radius for outer track in x: R_xo = {self.R_x[1]:.3g} m')
@@ -331,7 +328,7 @@ class Bearing:
             delta_bar (array) - Dimensionless elastic deformation
         '''
         self.X = np.linspace(-1,1,n_x)
-        P = -1 * self.X**2 + 1 # Dimensionless parabolic pressure distribution
+        P = -1 * self.X**2 + 1 # Dimensionless parabolic pressure distribution - Hertz distribution
         delta = 0
         self.delta_bar = np.zeros(n_x)
         for i in range(1, n_x-1):
@@ -363,8 +360,8 @@ class Bearing:
         self.delta[1] = self.D_x[1]**2 * self.delta_bar / self.R_x[1] # (18.23)
 
         if plotbool:
-            x1 = np.linspace(-self.D_x[0], self.D_x[0], len(self.X))
-            x2 = np.linspace(-self.D_x[1], self.D_x[1], len(self.X))
+            x1 = np.linspace(-self.D_x[0]/2, self.D_x[0]/2, len(self.X))
+            x2 = np.linspace(-self.D_x[1]/2, self.D_x[1]/2, len(self.X))
             plt.figure()
             plt.title('Elastic deformation of the rectangular contact')
             plt.plot(x1, self.delta[0], label='Inner track')
