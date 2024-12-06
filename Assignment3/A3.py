@@ -5,7 +5,7 @@ class Bearing:
     '''
     Cylindrical bearing class for Assignment 3
     '''
-    def __init__(self, InnerRaceDia:float=69.5e-3, OuterRaceDia:float=85.5e-3, RollerDia:float=8e-3, RollerLength:float=8e-3, NoOfRollers:int=20, MaxLoad:float=8000, InnerRaceSpeed:float=837, OuterRaceSpeed:float=0, EModulus:float=210e9, PoissonRatio:float=0.3, AbsoluteViscosity:float=0.01, PressViscCoef:float=2e-8)->None:
+    def __init__(self, InnerRaceDia:float=69.5e-3, OuterRaceDia:float=85.5e-3, RollerDia:float=8e-3, RollerLength:float=8e-3, NoOfRollers:int=20, MaxLoad:float=8000, InnerRaceSpeed:float=837, OuterRaceSpeed:float=0, EModulus:float=210e9, PoissonRatio:float=0.3, AbsoluteViscosity:float=0.01, PressViscCoef:float=2e-8, N:int=100)->None:
         '''
         Creates a new instance of the Bearing class with the given parameters.
 
@@ -22,6 +22,7 @@ class Bearing:
             PoissonRatio (float) - Poisson's ratio
             AbsoluteViscosity (float) [Pa s] - Base absolute viscosity of the lubricant
             PressViscCoef (float) [1 / (Pa s)] - Pressure-viscosity coefficient
+            N (int) - Number of points to evaluate the elliptic integrals (default: 100)
         
         Attributes:
             d_i (float) [m] - Inner race diameter
@@ -36,6 +37,7 @@ class Bearing:
             nu (float) - Poisson's ratio
             eta_0 (float) [Pa s] - Base absolute viscosity of the lubricant
             xi (float) [1 / (Pa s)] - Pressure-viscosity coefficient
+            N (int) - Number of points to evaluate the elliptic integrals
             r_ax (float) [m] - Curvature radius of the roller in the x direction
             r_ay (float) [m] - Curvature radius in the roller y direction
             r_bx (array) [m] - Curvature radius of the inner, outer track in the x direction
@@ -53,6 +55,7 @@ class Bearing:
         self.nu = PoissonRatio
         self.eta_0 = AbsoluteViscosity
         self.xi = PressViscCoef
+        self.N = N
 
         self.r_ax = self.d / 2      # (fig. 17.2)
         self.r_ay = np.inf          # (fig. 17.2)
@@ -319,24 +322,23 @@ class Bearing:
             print(f'Maximum contact pressure: for outer track p_mo = {self.p_m[1]:.3g} Pa')
 
 
-    def rectangular_dimensionless_deforamtion(self, n_x:int=100, plotbool:bool=False)->None:
+    def rectangular_dimensionless_deforamtion(self, plotbool:bool=False)->None:
         '''
         Calculates the dimensionless eleastic deformation of the rectangular contact
 
         Args:
-            n_x (int) - Number of points to evaluate the deformation (default: 100)
             plotbool (bool) - Plots the dimensionless deformation and pressure if True
         
         Attributes:
             X (array) - Dimensionless x coordinate
             delta_bar (array) - Dimensionless elastic deformation
         '''
-        self.X = np.linspace(-1,1,n_x)
+        self.X = np.linspace(-1,1,self.N)
         P = np.sqrt(1-self.X**2) # Dimensionless parabolic pressure distribution - Hertz distribution - (17.6)
         delta = 0
-        self.delta_bar = np.zeros(n_x)
-        for i in range(1, n_x-1):
-            for j in range(n_x):
+        self.delta_bar = np.zeros(self.N)
+        for i in range(1, self.N-1):
+            for j in range(self.N):
                 term1 = np.abs((self.X[i+1] + self.X[i])/2 - self.X[j])
                 term2 = np.abs((self.X[i-1] + self.X[i])/2 - self.X[j])
                 delta_new = delta + P[j] * np.log(term1 * term2) # (18.31)
@@ -356,6 +358,29 @@ class Bearing:
             plt.plot(self.X, P)
             plt.xlabel('X')
             plt.ylabel('P')
+            plt.show()
+
+
+    def rectangular_pressure_distribution(self, plotbool:bool=False)->None:
+        '''
+        Finds the pressure distribution of the rectangular contact
+
+        Args:
+            plotbool (bool) - Plots the pressure distribution if True
+        
+        Attributes:
+            x (array) [m] - x coordinate for inner, outer track
+            p (array) [Pa] - Pressure distribution for inner, outer track
+        '''
+        self.x = np.linspace(-self.D_x/2, self.D_x/2, self.N)
+        self.p = self.p_m * np.sqrt(1 - (2*self.x/self.D_x)**2) # (17.6) - dy inf
+
+        if plotbool:
+            plt.figure()
+            plt.title('Pressure distribution')
+            plt.plot(self.x, self.p)
+            plt.xlabel('x [m]')
+            plt.ylabel('p [Pa]')
             plt.show()
 
 
@@ -383,38 +408,6 @@ class Bearing:
             plt.xlabel('X')
             plt.ylabel('delta [m]')
             plt.legend()
-
-
-    def rectangular_pressure_distribution(self, normalized:bool=False, num_points:int=100, saveplot:bool=False)->None:
-        '''
-        Plots the pressure distribution of the rectangular contact
-
-        Args:
-            normalized (bool) - Normalizes the pressure distribution if True (default: False)
-            num_points (int) - Number of points to evaluate the pressure distribution (default: 100)
-            saveplot (bool) - Saves the plot if True (default: False)
-        '''
-        x = np.linspace(-self.l/2, self.l/2, num_points)
-        p_xi = self.p_m[0] * np.sqrt(1 - (2*x/self.l)**2) # (17.46)
-        p_xo = self.p_m[1] * np.sqrt(1 - (2*x/self.l)**2) # (17.46)
-
-        if normalized:
-            x /= self.l
-            p_xi /= self.p_m[0]
-            p_xo /= self.p_m[1]
-            plt.xlabel('x/l')
-            plt.ylabel('p/p_mi')    
-        else:
-            plt.xlabel('x [m]')
-            plt.ylabel('p [Pa]')
-    
-        plt.tick_params(axis='y', which='both', labelleft='off', labelright='on')
-        plt.plot(x, p_xi, label='Inner track')
-        plt.plot(x, p_xo, label='Outer track')
-
-        if saveplot:
-            np.savetxt('Assignment3/data/inner_track_pressure.txt', np.array([x, p_xi]).T)
-            np.savetxt('Assignment3/data/outer_track_pressure.txt', np.array([x, p_xo]).T)
 
 
     def rectangular_deformation_distribution(self, normalized:bool=False, num_points:int=100, saveplot:bool=False)->None:
@@ -468,9 +461,10 @@ if __name__ == '__main__':
         Q2.rectangular_dimensionless_load()
         Q2.rectangular_max_deformation(printbool=True)
         Q2.rectangular_max_pressure(printbool=True)
-        # Q2.rectangular_pressure_distribution(normalized=False)
-        Q2.rectangular_dimensionless_deforamtion(plotbool=True)
-        # Q2.rectangular_deformation(plotbool=True)
+        Q2.rectangular_dimensionless_deforamtion()
+        Q2.rectangular_contact_width()
+        Q2.rectangular_pressure_distribution(plotbool=True)
+
 
 
     if False: # Question 3
