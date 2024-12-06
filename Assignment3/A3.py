@@ -108,7 +108,10 @@ class Bearing:
             R_y (array) [m] - Effective radius of inner, outer track in the y direction
         '''
         self.R_x = (self.r_ax * self.r_bx) / (self.r_ax + self.r_bx) # (17.4)
-        self.R_y = (self.r_ay * self.r_by) / (self.r_ay + self.r_by) # (17.5)
+        if self.r_by[0] == -np.inf:
+            self.R_y = np.inf
+        else:
+            self.R_y = (self.r_ay * self.r_by) / (self.r_ay + self.r_by) # (17.5)
 
         if printbool:
             print(f'Effective radius for inner track in x: R_xi = {self.R_x[0]:.3g} m')
@@ -322,18 +325,22 @@ class Bearing:
 
         Args:
             n_x (int) - Number of points to evaluate the deformation (default: 100)
+            plotbool (bool) - Plots the dimensionless deformation and pressure if True
         
         Attributes:
             X (array) - Dimensionless x coordinate
             delta_bar (array) - Dimensionless elastic deformation
         '''
         self.X = np.linspace(-1,1,n_x)
-        P = -1 * self.X**2 + 1 # Dimensionless parabolic pressure distribution - Hertz distribution
+        P = np.sqrt(1-self.X**2) # Dimensionless parabolic pressure distribution - Hertz distribution - (17.6)
         delta = 0
         self.delta_bar = np.zeros(n_x)
         for i in range(1, n_x-1):
             for j in range(n_x):
-                delta = delta + P[j] * np.log(np.abs((self.X[i+1] + self.X[i])/2 - self.X[j]) * np.abs((self.X[i-1] + self.X[i])/2 - self.X[j])) # (18.31)
+                term1 = np.abs((self.X[i+1] + self.X[i])/2 - self.X[j])
+                term2 = np.abs((self.X[i-1] + self.X[i])/2 - self.X[j])
+                delta_new = delta + P[j] * np.log(term1 * term2) # (18.31)
+                delta = delta_new
             self.delta_bar[i] = - (self.X[i+1] - self.X[i]) / (2*np.pi) * delta
             delta = 0
         
@@ -343,6 +350,13 @@ class Bearing:
             plt.plot(self.X, self.delta_bar)
             plt.xlabel('X')
             plt.ylabel('delta_bar')
+
+            plt.figure()
+            plt.title('Dimensionless pressure distribution')
+            plt.plot(self.X, P)
+            plt.xlabel('X')
+            plt.ylabel('P')
+            plt.show()
 
 
     def rectangular_deformation(self, plotbool:bool=False)->None:
@@ -381,13 +395,13 @@ class Bearing:
             saveplot (bool) - Saves the plot if True (default: False)
         '''
         x = np.linspace(-self.l/2, self.l/2, num_points)
-        p_xi = self.p_mi * np.sqrt(1 - (2*x/self.l)**2) # (17.46)
-        p_xo = self.p_mo * np.sqrt(1 - (2*x/self.l)**2) # (17.46)
+        p_xi = self.p_m[0] * np.sqrt(1 - (2*x/self.l)**2) # (17.46)
+        p_xo = self.p_m[1] * np.sqrt(1 - (2*x/self.l)**2) # (17.46)
 
         if normalized:
             x /= self.l
-            p_xi /= self.p_mi
-            p_xo /= self.p_mo
+            p_xi /= self.p_m[0]
+            p_xo /= self.p_m[1]
             plt.xlabel('x/l')
             plt.ylabel('p/p_mi')    
         else:
@@ -423,7 +437,7 @@ class Bearing:
 
 
 if __name__ == '__main__':
-    if True: # Test
+    if False: # Test
         bearing = Bearing()
         bearing.max_load(printbool=True)
         bearing.effective_elastic_modulus(printbool=True)
@@ -438,7 +452,6 @@ if __name__ == '__main__':
         plt.show()
 
 
-
     if False: # Question 1
         print('Question 1')
         Q1 = Bearing()
@@ -446,20 +459,25 @@ if __name__ == '__main__':
         Q1.min_film_thickness(printbool=True)
 
 
-    if False: # Question 2
+    if True: # Question 2
         print('Question 2')
         Q2 = Bearing()
         Q2.max_load()
-        Q2.effective_radius(printbool=True)
-        Q2.effective_elastic_modulus(printbool=True)
-        Q2.rectangular_dimensionless_load(printbool=True)
+        Q2.effective_radius()
+        Q2.effective_elastic_modulus()
+        Q2.rectangular_dimensionless_load()
         Q2.rectangular_max_deformation(printbool=True)
         Q2.rectangular_max_pressure(printbool=True)
-        Q2.rectangular_pressure_distribution(normalized=True)
+        # Q2.rectangular_pressure_distribution(normalized=False)
+        Q2.rectangular_dimensionless_deforamtion(plotbool=True)
+        # Q2.rectangular_deformation(plotbool=True)
 
 
+    if False: # Question 3
+        print('Question 3')
 
 
-
+    if False: # Question 4
+        print('Question 4')
 
 
