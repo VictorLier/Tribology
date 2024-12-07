@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
+import scipy.sparse as sps
 
 class Bearing:
     '''
@@ -25,14 +27,12 @@ class Bearing:
             N (int) - Number of points to evaluate the elliptic integrals (default: 100)
         
         Attributes:
-            d_i (float) [m] - Inner race diameter
-            d_o (float) [m] - Outer race diameter
+            D (array) [m] - Inner and outer race diameter
             d (float) [m] - Diameter of the rollers
             l (float) [m] - Length of the rollers
             i (int) - Number of rollers
             w_z (float) [N] - Maximum radial load
-            omega_i (float) [rad/s] - Angular velocity of inner race
-            omega_o (float) [rad/s] - Angular velocity of outer race
+            omega (array) [rad/s] - Angular velocity of inner and outer race
             E (float) [Pa] - Young's Modulus
             nu (float) - Poisson's ratio
             eta_0 (float) [Pa s] - Base absolute viscosity of the lubricant
@@ -43,14 +43,12 @@ class Bearing:
             r_bx (array) [m] - Curvature radius of the inner, outer track in the x direction
             r_by (array) [m] - Curvature radius of the inner, outer track in the y direction
         '''
-        self.d_i = InnerRaceDia
-        self.d_o = OuterRaceDia
+        self.D = np.array([InnerRaceDia, OuterRaceDia])
         self.d = RollerDia
         self.l = RollerLength
         self.n = NoOfRollers
         self.w_z = MaxLoad
-        self.omega_i = InnerRaceSpeed
-        self.omega_o = OuterRaceSpeed
+        self.omega = np.array([InnerRaceSpeed, OuterRaceSpeed])
         self.E = EModulus
         self.nu = PoissonRatio
         self.eta_0 = AbsoluteViscosity
@@ -59,13 +57,41 @@ class Bearing:
 
         self.r_ax = self.d / 2      # (fig. 17.2)
         self.r_ay = np.inf          # (fig. 17.2)
-        self.r_bx = np.array([self.d_i/2,  -self.d_o/2])    # (fig. 17.2)
+        self.r_bx = np.array([self.D[0]/2,  -self.D[1]/2])    # (fig. 17.2)
         self.r_by = np.array([-np.inf, np.inf])            # (fig. 17.2)
+
+        self.clearance()
+
+
+    def clearance(self, printbool:bool=False)->None:
+        '''
+        Calculates the clearance of the bearing
+
+        Args:
+            printbool (bool) - Prints the clearance if True
+        
+        Attributes:
+            c_d (float) [m] - Clearance of the bearing
+            clear (bool) - True if the bearing has clearance
+        '''
+        self.c_d = self.D[1] - self.D[0] - 2 * self.d # (21.2)
+
+        if self.c_d > 0:
+            self.clear = True
+        elif self.c_d == 0:
+            self.clear = False
+        else:
+            raise ValueError('Negative clearance')
+
+        if printbool:
+            print(f'Bearing has clearance: {self.clear}')
+            print(f'Clearance of the bearing: c_d = {self.c_d:.4g} m')
 
 
     def max_load(self, printbool:bool=False)->None:
         '''
         Calculates the load of the roller with the highest load
+        Accounts for clearance
         
         Args:
             printbool (bool) - Prints the maximum load if True
@@ -73,11 +99,19 @@ class Bearing:
         Attributes:
             w_zm (float) [N] - Maximum radial load
         '''
-        self.w_zm = self.w_z*4 / self.n   # (21.47)
+        if not self.clear:
+            self.w_zm = self.w_z*4 / self.n   # (21.47)
+
+        elif self.clear:
+            Z_up = np.pi * (1 - self.c_d/2 * self.delta_m)**(3/2)
+            Z_down = 2.491 * ((1 + ( (1 - self.c_d/2 * self.delta_m)/1.23 )**2 )**(1/2) - 1)
+            Z_w = Z_up / Z_down # (21.46)
+            self.w_zm = self.w_z * Z_w / self.n # (21.45)
+            self.w_zm = self.w_zm[0] # Both sides should be the same
 
         if printbool:
-            print(f'Maximum load on a roller: w_zm = {self.w_zm:.3g} N')
-
+            print(f'Load of the roller with the highest load: w_zm = {self.w_zm:.3g} N')
+        
 
     def min_film_thickness(self, printbool:bool=False, Lambda:float=3, R_at:float=0.3e-6, R_ar:float=0.12e-6)->None:
         '''
@@ -93,10 +127,10 @@ class Bearing:
         R_a = np.array([R_at, R_ar])
         R_q = R_a * 1.11 # (3.5)
 
-        h_min = Lambda * (R_q[0]**2 + R_q[1]**2)**0.5 # (3.22)
+        self.h_min = Lambda * (R_q[0]**2 + R_q[1]**2)**0.5 # (3.22)
 
         if printbool:
-            print(f'Minimum film thickness: h_min = {h_min:.3g} m')
+            print(f'Minimum film thickness: h_min = {self.h_min:.3g} m')
 
 
     def effective_radius(self, printbool:bool=False)->None:
@@ -265,13 +299,13 @@ class Bearing:
             W_prime (array) - Dimensionless load for the inner, outer track
             w_x_prime (array) [N/m] - load per unit width
         '''
-        self.w_x_prime = self.w_zm / self.l # (p. 448)        
-        self.W_prime = self.w_x_prime / (self.E_prime * self.R_x) # (17.38)
+        self.w_zm_prime = self.w_zm / self.l # (p. 448)        
+        self.W_prime = self.w_zm_prime / (self.E_prime * self.R_x) # (17.38)
 
         if printbool:
             print(f'Dimensionless load for inner track: W_primei = {self.W_prime[0]:.3g}')
             print(f'Dimensionless load for outer track: W_primeo = {self.W_prime[1]:.3g}')
-            print(f'Load per unit width: w_x_prime = {self.w_x_prime:.3g} N/m')
+            print(f'Load per unit width: w_x_prime = {self.w_zm_prime:.3g} N/m')
 
 
     def rectangular_contact_width(self, printbool:bool=False)->None:
@@ -322,45 +356,6 @@ class Bearing:
             print(f'Maximum contact pressure: for outer track p_mo = {self.p_m[1]:.3g} Pa')
 
 
-    def rectangular_dimensionless_deforamtion(self, plotbool:bool=False)->None:
-        '''
-        Calculates the dimensionless eleastic deformation of the rectangular contact
-
-        Args:
-            plotbool (bool) - Plots the dimensionless deformation and pressure if True
-        
-        Attributes:
-            X (array) - Dimensionless x coordinate
-            delta_bar (array) - Dimensionless elastic deformation
-        '''
-        self.X = np.linspace(-1,1,self.N)
-        P = np.sqrt(1-self.X**2) # Dimensionless parabolic pressure distribution - Hertz distribution - (17.6)
-        delta = 0
-        self.delta_bar = np.zeros(self.N)
-        for i in range(1, self.N-1):
-            for j in range(self.N):
-                term1 = np.abs((self.X[i+1] + self.X[i])/2 - self.X[j])
-                term2 = np.abs((self.X[i-1] + self.X[i])/2 - self.X[j])
-                delta_new = delta + P[j] * np.log(term1 * term2) # (18.31)
-                delta = delta_new
-            self.delta_bar[i] = - (self.X[i+1] - self.X[i]) / (2*np.pi) * delta
-            delta = 0
-        
-        if plotbool:
-            plt.figure()
-            plt.title('Dimensionless elastic deformation')
-            plt.plot(self.X, self.delta_bar)
-            plt.xlabel('X')
-            plt.ylabel('delta_bar')
-
-            plt.figure()
-            plt.title('Dimensionless pressure distribution')
-            plt.plot(self.X, P)
-            plt.xlabel('X')
-            plt.ylabel('P')
-            plt.show()
-
-
     def rectangular_pressure_distribution(self, plotbool:bool=False)->None:
         '''
         Finds the pressure distribution of the rectangular contact
@@ -372,16 +367,72 @@ class Bearing:
             x (array) [m] - x coordinate for inner, outer track
             p (array) [Pa] - Pressure distribution for inner, outer track
         '''
-        self.x = np.linspace(-self.D_x/2, self.D_x/2, self.N)
+        self.x = np.linspace(-self.D_x, self.D_x, self.N)
         self.p = self.p_m * np.sqrt(1 - (2*self.x/self.D_x)**2) # (17.6) - dy inf
+        self.p = np.nan_to_num(self.p) # Replace nan with zero
 
         if plotbool:
             plt.figure()
             plt.title('Pressure distribution')
-            plt.plot(self.x, self.p)
+            plt.plot(self.x[:,0], self.p[:,0], label='Inner track')
+            plt.plot(self.x[:,1], self.p[:,1], label='Outer track')
             plt.xlabel('x [m]')
             plt.ylabel('p [Pa]')
-            plt.show()
+            plt.grid()
+            plt.legend()
+
+            np.savetxt('Assignment3/data/pressure_distribution_inner.txt', np.array([self.x[:,0], self.p[:,0]]).T)
+            np.savetxt('Assignment3/data/pressure_distribution_outer.txt', np.array([self.x[:,1], self.p[:,1]]).T) 
+
+
+    def rectangular_dimensionless_deforamtion(self, plotbool:bool=False)->None:
+        '''
+        Calculates the dimensionless eleastic deformation of the rectangular contact
+
+        Args:
+            plotbool (bool) - Plots the dimensionless deformation and pressure if True
+        
+        Attributes:
+            X (array) - Dimensionless x coordinate
+            delta_bar (array) - Dimensionless elastic deformation
+        '''
+        X = np.linspace(-2,2,self.N)
+        extra_points = np.array([X[0] - (X[1] - X[0]), X[-1] + (X[1] - X[0])])
+        self.X = np.concatenate(([extra_points[0]], X, [extra_points[1]]))
+        P = np.sqrt(1-self.X**2) # Dimensionless parabolic pressure distribution - Hertz distribution - (17.6)
+        P = np.nan_to_num(P, 0) # Replace nan with zero
+        delta = 0
+        self.delta_bar = np.zeros(self.N+2)
+        for i in range(1, self.N+1):
+            for j in range(self.N+2):
+                term1 = np.abs((self.X[i+1] + self.X[i])/2 - self.X[j])
+                term2 = np.abs((self.X[i-1] + self.X[i])/2 - self.X[j])
+                delta_new = delta + P[j] * np.log(term1 * term2) # (18.31)
+                delta = delta_new
+            Delta = self.X[i+1] - self.X[i]
+            self.delta_bar[i] = - Delta / (2*np.pi) * delta
+            delta = 0
+        self.X = self.X[1:-1]
+        self.delta_bar = self.delta_bar[1:-1]
+        P = P[1:-1]
+
+        if plotbool:
+            plt.figure()
+            plt.title('Dimensionless elastic deformation')
+            plt.plot(self.X, self.delta_bar)
+            plt.xlabel('X')
+            plt.ylabel('delta_bar')
+            plt.grid()
+
+            plt.figure()
+            plt.title('Dimensionless pressure distribution')
+            plt.plot(self.X, P)
+            plt.xlabel('X')
+            plt.ylabel('P')
+            plt.grid()
+
+            np.savetxt('Assignment3/data/dimensionless_deformation.txt', np.array([self.X, self.delta_bar]).T)
+            np.savetxt('Assignment3/data/dimensionless_pressure.txt', np.array([self.X, P]).T)
 
 
     def rectangular_deformation(self, plotbool:bool=False)->None:
@@ -394,55 +445,282 @@ class Bearing:
         Attributes:
             delta (array) [m] - Elastic deformation of the inner, outer rectangular contact
         '''
-        self.delta = np.zeros((2, len(self.X)))
-        self.delta[0] = self.D_x[0]**2 * self.delta_bar / self.R_x[0] # (18.23)
-        self.delta[1] = self.D_x[1]**2 * self.delta_bar / self.R_x[1] # (18.23)
+        self.delta = np.zeros((self.N,2))
+        self.delta[:,0] = (self.D_x[0]/2)**2 * self.delta_bar / self.R_x[0] # (17.23)
+        self.delta[:,1] = (self.D_x[1]/2)**2 * self.delta_bar / self.R_x[1] # (17.23)
 
         if plotbool:
-            x1 = np.linspace(-self.D_x[0]/2, self.D_x[0]/2, len(self.X))
-            x2 = np.linspace(-self.D_x[1]/2, self.D_x[1]/2, len(self.X))
             plt.figure()
             plt.title('Elastic deformation of the rectangular contact')
-            plt.plot(x1, self.delta[0], label='Inner track')
-            plt.plot(x2, self.delta[1], label='Outer track')
-            plt.xlabel('X')
+            plt.plot(self.x[:,0], self.delta[:,0], label='Inner track')
+            plt.plot(self.x[:,1], self.delta[:,1], label='Outer track')
+            plt.xlabel('x [m]')
             plt.ylabel('delta [m]')
+            plt.grid()
             plt.legend()
 
+            np.savetxt('Assignment3/data/deformation_inner.txt', np.array([self.x[:,0], self.delta[:,0]]).T)
+            np.savetxt('Assignment3/data/deformation_outer.txt', np.array([self.x[:,1], self.delta[:,1]]).T)
+        
 
-    def rectangular_deformation_distribution(self, normalized:bool=False, num_points:int=100, saveplot:bool=False)->None:
+    def rectangular_roller_geometry(self, plotbool:bool=False)->None:
         '''
-        Plot the rectangular deformation distribution
+        Plots the geometry of the roller with the rectangular contact
+
+        Args:
+            plotbool (bool) - Plots the roller geometry if True
+        '''
+        S = self.x**2 / (2 * self.R_x)
+        h = S + self.delta
+
+        if plotbool:
+            plt.figure()
+            plt.title('Inner track roller geometry')
+            plt.plot(self.x[:,0], S[:,0], label='Undeformed roller', linestyle='--')
+            plt.plot(self.x[:,0], h[:,0], label='Deformed roller', linestyle='-')
+
+            plt.xlabel('x [m]')
+            plt.ylabel('y [m]')
+            plt.legend()
+            plt.grid()
+
+            plt.figure()
+            plt.title('Outer track roller geometry')
+            plt.plot(self.x[:,1], S[:,1], label='Undeformed roller', linestyle='--')
+            plt.plot(self.x[:,1], h[:,1], label='Deformed roller', linestyle='-')
+
+            plt.xlabel('x [m]')
+            plt.ylabel('y [m]')
+            plt.legend()
+            plt.grid()
+
+            np.savetxt('Assignment3/data/undeformed_inner.txt', np.array([self.x[:,0], S[:,0]]).T)
+            np.savetxt('Assignment3/data/deformed_inner.txt', np.array([self.x[:,0], h[:,0]]).T)
+
+            np.savetxt('Assignment3/data/undeformed_outer.txt', np.array([self.x[:,1], S[:,1]]).T)
+            np.savetxt('Assignment3/data/deformed_outer.txt', np.array([self.x[:,1], h[:,1]]).T)
+
+
+    def velocity(self, printbool:bool=False)->None:
+        '''
+        Calculates the velocity of the roller and the mean surface velocity
+
+        Args:
+            printbool (bool) - Prints the velocity of the roller if True
+        
+        Attributes:
+            u (array) [m/s] - Velocity of the inner and outer track
+            u_bar (float) [m/s] - Mean surface velocity
+        '''
+        self.u = np.array([9,9])
+        self.u_bar = np.mean(self.u)
+
+        if printbool:
+            print(f'Velocity of the inner track: u_i = {self.u[0]:.3g} m/s')
+            print(f'Velocity of the outer track: u_o = {self.u[1]:.3g} m/s')
+            print(f'Mean surface velocity: u_bar = {self.u_bar:.3g} m/s')
+
+
+    def finite_difference(self, Nx:int=10, plotbool:bool=False, printbool:bool=False)->None:
+        '''
+        Solves the Reynolds equation with a finite difference method
         
         Args:
-            normalized (bool) - Normalizes the deformation distribution if True (default: False)
-            num_points (int) - Number of points to evaluate the deformation distribution (default: 100)
-            saveplot (bool) - Saves the plot if True (default: False)
+            Nx (int) - Number of points in each direction (default: 10)
+            plotbool (bool) - Plots the solution if True
+            printbool (bool) - Prints the solution if True
         '''
-        X = np.linspace(-0.5, 0.5, num_points)
-        Delta = X[1] - X[0]
-        delta_ii = np.zeros(num_points)
-        delta_io = np.zeros(num_points)
-        P = np.sqrt(1 - (2*X)**2) # (17.46)
+        X, Y = np.meshgrid(np.linspace(0, 1, Nx), np.linspace(0, 1, Nx))
+
+        x_ = X.flatten('F')        
         
+        dX = X[1] - X[0]
+        dY = Y[1] - Y[0]
+
+        h0 = 0.03e-6    # Assumed minimum film thickness [m]
+
+        M = sps.eye(Nx**2, format='csr') # Matrix
+        rhs = np.zeros(Nx**2) # Right hand side
+
+        H = 1 + (self.d/2)/(2*h0) * (x_ - 1)**2
+        lam = self.l / self.d
+
+        r = self.d/2
+
+        for i in range(1, Nx - 1):
+            for j in range(1, Nx - 1):
+                c = j + i * Nx
+                n = c + 1
+                s = c - 1
+                e = j + Nx * (i + 1)
+                w = j + Nx * (i - 1)
+
+                M[c, c] = (-2 / dX**2 - 2 / (lam**2 * dY**2) - 3 * (((np.sqrt(H[e]) - np.sqrt(H[w])) * (H[e] - H[w])) / 4 + np.sqrt(H[c]) * (H[w] - 2 * H[c] + H[e])) / (2 * H[c]**(3/2) * dX**2))
+                M[c, n] = 1 / (lam**2 * dY**2)
+                M[c, s] = 1 / (lam**2 * dY**2)
+                M[c, e] = 1 / dX**2
+                M[c, w] = 1 / dX**2
+
+                rhs[c] = 1 / (H[c]**(3/2)) * (H[e] - H[w]) / (2 * dX)
+
+        g = sps.linalg.spsolve(M, rhs)
+        G = np.reshape(g, (Nx, Nx))
+        P = G * (H**(-3/2))
+        p = (6 * self.eta_0 * (self.u[0] + self.u[1]) * r * P) / (h0**2)
+        h = h0 * H
+
+        # Visc
+        p_new = -(1/self.xi) * np.log(np.abs(1 - self.xi * p))
+        eta_new = self.eta_0 * np.exp(self.xi * p_new)
+
+        if plotbool:
+            plt.figure()
+            plt.contourf(X, Y, h)
+            plt.colorbar()
+            plt.title('Film thickness')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+
+            plt.figure()
+            plt.contourf(X, Y, p)
+            plt.colorbar()
+            plt.title('Pressure')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+
+            plt.figure()
+            plt.contourf(X, Y, eta_new)
+            plt.colorbar()
+            plt.title('Viscosity')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+
+
+    def dimenionless_speed(self, printbool:bool=False)->None:
+        '''
+        Calculates the dimensionless speed parameter for the outer track
+
+        Args:
+            printbool (bool) - Prints the dimensionless speed if True
+        
+        Attributes:
+            U (float) - Dimensionless speed parameter
+        '''
+        self.U = self.eta_0 * self.u_bar / (self.E_prime * self.R_x[1]**2) # 18.10
+
+        if printbool:
+            print(f'Dimensionless speed parameter: U = {self.U:.3g}')
+
+
+    def dimensionless_load(self, printbool:bool=False)->None:
+        '''
+        Calculates the dimensionless load parameter for the outer track
+
+        Args:
+            printbool (bool) - Prints the dimensionless load if True
+        
+        Attributes:
+            W (float) - Dimensionless load parameter
+        '''
+        self.W = self.w_zm / (self.E_prime * self.R_x[1])   # 18.11
+
+        if printbool:
+            print(f'Dimensionless load parameter: W = {self.W:.3g}')
+
+
+    def dimensionless_material(self, printbool:bool=False)->None:
+        '''
+        Calculates the dimensionless material parameter for the outer track
+
+        Args:
+            printbool (bool) - Prints the dimensionless material parameter if True
+        
+        Attributes:
+            G (float) - Dimensionless material parameter
+        '''
+        self.G = self.xi * self.E_prime  # 18.14
+
+        if printbool:
+            print(f'Dimensionless material parameter: G = {self.G:.3g}')
+
+
+    def pressure_spike(self, printbool:bool=False)->None:
+        '''
+        Calculates the pressure spike amplitude and location from the operating parameters
+
+        Args:
+            printbool (bool) - Prints the pressure spike if True
+        
+        Attributes:
+            p_sk (float) [Pa] - Pressure spike amplitude
+            x_sk (float) [m] - Pressure spike location
+        '''
+        self.p_sk = 0.648 * self.W**(0.185) * self.U**(0.275) * self.G**(0.391) * self.E_prime # 18.70
+        self.x_sk = 1.111 * self.W**(0.606) * self.U**(-0.021) * self.G**(0.077) * self.R_x[1] # 18.71
+
+        if printbool:
+            print(f'Pressure spike amplitude: p_sk = {self.p_sk:.3g} Pa')
+            print(f'Pressure spike location: x_sk = {self.x_sk:.3g} m')
+
+
+    def minimum_film_thickness(self, printbool:bool=False)->None:
+        '''
+        Calculates the minimum film thickness and location from the operating parameters
+
+        Args:
+            printbool (bool) - Prints the minimum film thickness if True
+        
+        Attributes:
+            h_min (float) [m] - Minimum film thickness
+            x_min (float) [m] - Minimum film thickness location
+        '''
+        self.h_min = 1.714 * self.W**(-0.128) * self.U**(0.694) * self.G**(0.568) * self.R_x[1] # 18.72
+        self.x_min = 1.439 * self.W**(0.548) * self.U**(-0.011) * self.G**(0.026) * self.R_x[1] # 18.75
+
+        if printbool:
+            print(f'Minimum film thickness: h_min = {self.h_min:.3g} m')
+            print(f'Minimum film thickness location: x_min = {self.x_min:.3g} m')
+
+
+    def center_of_pressure(self, printbool:bool=False)->None:
+        '''
+        Calculates the center of pressure from the operating parameters
+
+        Args:
+            printbool (bool) - Prints the center of pressure if True
+        
+        Attributes:
+            x_cp (float) - Center of pressure
+        '''
+        self.x_cp = -3.595 * self.W**(-1.019) * self.U**(0.638) * self.G**(-0.358) * self.R_x[1] # 18.76
+
+        if printbool:
+            print(f'Center of pressure: x_cp = {self.x_cp:.3g} m')
+
+
+    def center_film_thickness(self, printbool:bool=False)->None:
+        '''
+        Calculates the center film thickness from the operating parameters
+
+        Args:
+            printbool (bool) - Prints the center film thickness if True
+        
+        Attributes:
+            h_c (float) - Center film thickness
+        '''
+        self.h_c = 2.922 * self.W**(-0.166) * self.U**(0.692) * self.G**(0.470) * self.R_x[1] # 18.74
+
+        if printbool:
+            print(f'Center film thickness: h_c = {self.h_c:.3g} m')
+
+
 
 
 
 
 if __name__ == '__main__':
     if False: # Test
-        bearing = Bearing()
-        bearing.max_load(printbool=True)
-        bearing.effective_elastic_modulus(printbool=True)
-        bearing.effective_radius(printbool=True)
-        bearing.rectangular_dimensionless_load(printbool=True)
-        bearing.rectangular_contact_width(printbool=True)
-        bearing.rectangular_dimensionless_deforamtion(n_x=5, plotbool=True)
-        bearing.rectangular_deformation(plotbool=True)
-        
-        
-        
-        plt.show()
+        print('Test')
 
 
     if False: # Question 1
@@ -452,26 +730,72 @@ if __name__ == '__main__':
         Q1.min_film_thickness(printbool=True)
 
 
-    if True: # Question 2
+    if False: # Question 2
         print('Question 2')
-        Q2 = Bearing()
+        Q2 = Bearing(N=100)
         Q2.max_load()
+        Q2.min_film_thickness()
         Q2.effective_radius()
         Q2.effective_elastic_modulus()
         Q2.rectangular_dimensionless_load()
+        
+        print("Part 1")
         Q2.rectangular_max_deformation(printbool=True)
         Q2.rectangular_max_pressure(printbool=True)
+
+        print("Part 2")
+        print(f"For the inner track the deformation is {Q2.delta_m[0]:.3g} m and the minimum film thickness is {Q2.h_min:.3g} m")
+
+        print("Part 3")
         Q2.rectangular_dimensionless_deforamtion()
         Q2.rectangular_contact_width()
         Q2.rectangular_pressure_distribution(plotbool=True)
+        Q2.rectangular_deformation(plotbool=True)
+        Q2.rectangular_roller_geometry(plotbool=True)
 
+        print("Part 5")
+        Q2.D[1] = 85.51e-3    # [m]
+        Q2.clearance(printbool=True)
+        Q2.max_load(printbool=True)
+        
+        plt.show()
 
 
     if False: # Question 3
         print('Question 3')
+        Q3 = Bearing()
+        Q3.velocity(printbool=True)
+        Q3.finite_difference(Nx=10, plotbool=True)
 
 
     if False: # Question 4
         print('Question 4')
+        Q4 = Bearing()
+        Q4.max_load()
+        Q4.effective_elastic_modulus()
+        Q4.effective_radius()
+        Q4.velocity()
+        Q4.dimenionless_speed()
+        Q4.dimensionless_load()
+        Q4.dimensionless_material()
+
+        print("Part 1")
+        Q4.pressure_spike(printbool=True)
+        Q4.minimum_film_thickness(printbool=True)
+        Q4.center_of_pressure(printbool=True)
+        Q4.center_film_thickness(printbool=True)
+
+        print("Part 2")
+        plt.figure()
+        plt.plot()
+        plt.scatter(Q4.x_sk, Q4.p_sk, label='Pressure spike')
+        plt.scatter(Q4.x_min, Q4.h_min, label='Minimum film thickness')
+        plt.scatter(Q4.x_cp, 0, label='Center of pressure')
+        plt.scatter(Q4.x_cp, Q4.h_c, label='Center film thickness')
+        plt.xlabel('x [m]')
+        plt.ylabel('y [m]')
+        plt.legend()
+        plt.grid()
+        plt.show()
 
 
