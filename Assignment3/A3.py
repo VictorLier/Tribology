@@ -312,10 +312,13 @@ class Bearing:
         '''
         Calculates the contact width of the rectangular contact
 
+        Args:
+            printbool (bool) - Prints the contact width if True
+        
         attributes:
             D_x (array) [m] - Contact width for the inner, outer track
         '''
-        self.D_x = 2 * self.R_x * (8 * self.W_prime / np.pi)**0.5 # (17.37)
+        self.D_x = 2 * self.R_x * (8 * self.W_prime / np.pi)**0.5 # (17.37) - 
 
         if printbool:
             print(f'Contact width for inner track: b_i = {self.D_x[0]:.3g} m')
@@ -446,8 +449,8 @@ class Bearing:
             delta (array) [m] - Elastic deformation of the inner, outer rectangular contact
         '''
         self.delta = np.zeros((self.N,2))
-        self.delta[:,0] = (self.D_x[0]/2)**2 * self.delta_bar / self.R_x[0] # (17.23)
-        self.delta[:,1] = (self.D_x[1]/2)**2 * self.delta_bar / self.R_x[1] # (17.23)
+        self.delta[:,0] = (self.D_x[0]/2)**2 * self.delta_bar / self.R_x[0] # (18.23)
+        self.delta[:,1] = (self.D_x[1]/2)**2 * self.delta_bar / self.R_x[1] # (18.23)
 
         if plotbool:
             plt.figure()
@@ -470,8 +473,8 @@ class Bearing:
         Args:
             plotbool (bool) - Plots the roller geometry if True
         '''
-        S = self.x**2 / (2 * self.R_x)
-        h = S + self.delta
+        S = self.x**2 / (2 * self.R_x) # p. 456
+        h = S + self.delta # 18.19
 
         if plotbool:
             plt.figure()
@@ -655,8 +658,8 @@ class Bearing:
             p_sk (float) [Pa] - Pressure spike amplitude
             x_sk (float) [m] - Pressure spike location
         '''
-        self.p_sk = 0.648 * self.W**(0.185) * self.U**(0.275) * self.G**(0.391) * self.E_prime # 18.70
-        self.x_sk = 1.111 * self.W**(0.606) * self.U**(-0.021) * self.G**(0.077) * self.R_x[1] # 18.71
+        self.p_sk = 0.648 * self.W_prime[1]**(0.185) * self.U**(0.275) * self.G**(0.391) * self.E_prime # 18.70
+        self.x_sk = 1.111 * self.W_prime[1]**(0.606) * self.U**(-0.021) * self.G**(0.077) * self.R_x[1] # 18.71
 
         if printbool:
             print(f'Pressure spike amplitude: p_sk = {self.p_sk:.3g} Pa')
@@ -674,8 +677,8 @@ class Bearing:
             h_min (float) [m] - Minimum film thickness
             x_min (float) [m] - Minimum film thickness location
         '''
-        self.h_min = 1.714 * self.W**(-0.128) * self.U**(0.694) * self.G**(0.568) * self.R_x[1] # 18.72
-        self.x_min = 1.439 * self.W**(0.548) * self.U**(-0.011) * self.G**(0.026) * self.R_x[1] # 18.75
+        self.h_min = 1.714 * self.W_prime[1]**(-0.128) * self.U**(0.694) * self.G**(0.568) * self.R_x[1] # 18.72
+        self.x_min = 1.439 * self.W_prime[1]**(0.548) * self.U**(-0.011) * self.G**(0.026) * self.R_x[1] # 18.75
 
         if printbool:
             print(f'Minimum film thickness: h_min = {self.h_min:.3g} m')
@@ -692,7 +695,7 @@ class Bearing:
         Attributes:
             x_cp (float) - Center of pressure
         '''
-        self.x_cp = -3.595 * self.W**(-1.019) * self.U**(0.638) * self.G**(-0.358) * self.R_x[1] # 18.76
+        self.x_cp = -3.595 * self.W_prime[1]**(-1.019) * self.U**(0.638) * self.G**(-0.358) * self.R_x[1] # 18.76
 
         if printbool:
             print(f'Center of pressure: x_cp = {self.x_cp:.3g} m')
@@ -708,7 +711,7 @@ class Bearing:
         Attributes:
             h_c (float) - Center film thickness
         '''
-        self.h_c = 2.922 * self.W**(-0.166) * self.U**(0.692) * self.G**(0.470) * self.R_x[1] # 18.74
+        self.h_c = 2.922 * self.W_prime[1]**(-0.166) * self.U**(0.692) * self.G**(0.470) * self.R_x[1] # 18.74
 
         if printbool:
             print(f'Center film thickness: h_c = {self.h_c:.3g} m')
@@ -730,9 +733,9 @@ if __name__ == '__main__':
         Q1.min_film_thickness(printbool=True)
 
 
-    if False: # Question 2
+    if True: # Question 2
         print('Question 2')
-        Q2 = Bearing(N=100)
+        Q2 = Bearing()
         Q2.max_load()
         Q2.min_film_thickness()
         Q2.effective_radius()
@@ -776,7 +779,7 @@ if __name__ == '__main__':
         Q4.effective_radius()
         Q4.velocity()
         Q4.dimenionless_speed()
-        Q4.dimensionless_load()
+        Q4.rectangular_dimensionless_load()
         Q4.dimensionless_material()
 
         print("Part 1")
