@@ -570,6 +570,22 @@ class Bearing:
             print(f'Finite wide film thickness for outer track: h_min_o = {self.h_min[1]:.3g} m')
 
 
+    def load_finite(self, printbool:bool=False)->None:
+        '''
+        Calculates the total load from the FD solution
+
+        Args:
+            printbool (bool) - Prints the total load if True
+        
+        Attributes:
+            w_fine (float) [N] - Total load from FD
+        '''
+        self.w_fine = np.trapezoid(np.trapezoid(self.p, self.x[0,:]), self.y[:,0]) # 16.38
+
+        if printbool:
+            print(f'The total load from FD is: {self.w_fine:.3g} N')
+
+
     def finite_difference(self, Nx:int=100, plotbool:bool=False, printbool:bool=False)->None:
         '''
         Solves the Reynolds equation with a finite difference method
@@ -578,11 +594,20 @@ class Bearing:
             Nx (int) - Number of points in each direction (default: 10)
             plotbool (bool) - Plots the solution if True
             printbool (bool) - Prints the solution if True
+        
+        Attributes:
+            p (array) [Pa] - Pressure distribution
+            h (array) [m] - Film thickness
+            w_fine (float) [N] - Total load from FD
+            h_min_fine (float) [m] - Minimum film thickness from FD
+            x (array) [m] - x coordinate
+            y (array) [m] - y coordinate
+        
         '''
         h_min = self.h_min[0]
         lam = self.l / self.d # 16.40
 
-        X = np.linspace(0, 1, Nx) # p. 403
+        X = np.linspace(0.8, 1, Nx) # p. 403
         Y = np.linspace(-1, 1, Nx) # p. 403
 
         dX = X[1] - X[0]
@@ -635,10 +660,11 @@ class Bearing:
         x = X * self.r - self.r # 16.38
         y = Y * self.l/2 # 16.38
 
-        self.w_fine = np.trapezoid(np.trapezoid(self.p, x), y) 
         self.h_min_fine = np.min(self.h)
 
-        x, y = np.meshgrid(x, y)
+        self.x, self.y = np.meshgrid(x, y)
+
+        self.load_finite()
 
         if printbool:
             print(f'The total load from FD is: {self.w_fine:.3g} N')
@@ -647,7 +673,7 @@ class Bearing:
 
         if plotbool:
             ax = plt.figure().add_subplot(111, projection='3d')
-            ax.plot_surface(x, y, self.p, cmap='viridis')
+            ax.plot_surface(self.x, self.y, self.p, cmap='viridis')
             plt.title('Pressure distribution')
             ax.set_xlabel('x [m]')
             ax.set_ylabel('y [m]')
@@ -655,15 +681,63 @@ class Bearing:
 
 
             plt.figure()
-            plt.plot(x[0,:], self.h[0,:])
+            plt.plot(self.x[0,:], self.h[0,:])
             plt.title('Film thickness')
             plt.xlabel('x [m]')
             plt.ylabel('h [m]')
             plt.grid()
 
 
+    def finite_visc(self, plotbool:bool=False, printbool:bool=False)->None:
+        '''
+        Finds the viscosity of the lubricant in the roller bearing based on the pressure from the finite difference method
+
+        Args:
+            plotbool (bool) - Plots the viscosity if True
+            printbool (bool) - Prints the viscosity if True
+        
+        Attributes:
+            eta (array) [Pa s] - Viscosity distribution
+        '''
+        self.eta = self.eta_0 * np.exp(self.xi * self.p) # 18.3
+
+        if printbool:
+            print(f'Minimum viscosity: {np.min(self.eta):.3g} Pa s')
+            print(f'The change in viscosity: {np.max(self.eta) - self.eta_0:.3g} Pa s')
+
+        if plotbool:
+            ax = plt.figure().add_subplot(111, projection='3d')
+            ax.plot_surface(self.x, self.y, self.eta, cmap='viridis')
+            plt.title('Viscosity distribution')
+            ax.set_xlabel('x [m]')
+            ax.set_ylabel('y [m]')
+            ax.set_zlabel('Viscosity [Pa s]')
 
 
+    def finit_pres(self, plotbool:bool=False, printbool:bool=False)->None:
+        '''
+        Calculates the pressure distribution of the roller bearing based on the viscosity from the finite difference method
+
+        Args:
+            plotbool (bool) - Plots the pressure distribution if True
+            printbool (bool) - Prints the pressure distribution if True
+
+        Attributes:
+            p_visc (array) [Pa] - Pressure distribution
+        '''
+        p_star = 1 - np.exp(-self.xi * self.p) # 18.3
+        self.p = -1/self.xi * np.log(1 - self.xi * self.p) # 18.6
+
+        if printbool:
+            print(f'Maximum pressure: {np.max(self.p):.3g} Pa')
+
+        if plotbool:
+            ax = plt.figure().add_subplot(111, projection='3d')
+            ax.plot_surface(self.x, self.y, self.p, cmap='viridis')
+            plt.title('Pressure distribution with viscios effects')
+            ax.set_xlabel('x [m]')
+            ax.set_ylabel('y [m]')
+            ax.set_zlabel('Pressure [Pa]')
 
 
     def dimenionless_speed(self, printbool:bool=False)->None:
@@ -870,17 +944,22 @@ if __name__ == '__main__':
         plt.show()
 
 
-    if True: # Question 3
+    if False: # Question 3
         print('Question 3')
         Q3 = Bearing()
         print("Part 1")
         Q3.velocity(printbool=True)
         Q3.infinily_wide_filmthickness(printbool=True)
-        # Q3.finite_wide_filmthickness(printbool=True)
+        Q3.finite_wide_filmthickness(printbool=True)
 
         print("Part 2")
         Q3.finite_difference(plotbool=True, printbool=True)
         # Highly dependant on the number of points in the finite difference method
+
+        print("Part 3")
+        Q3.finite_visc(plotbool=True, printbool=True)
+        Q3.finit_pres(plotbool=True, printbool=True)
+        Q3.load_finite(printbool=True)
 
         plt.show()
 
