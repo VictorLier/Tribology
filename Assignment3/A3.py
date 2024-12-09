@@ -29,9 +29,11 @@ class Bearing:
         Attributes:
             D (array) [m] - Inner and outer race diameter
             d (float) [m] - Diameter of the rollers
+            r (float) [m] - Radius of the rollers
             l (float) [m] - Length of the rollers
             i (int) - Number of rollers
             w_z (float) [N] - Maximum radial load
+            w_z_prime (float) [N/m] - Maximum radial load per unit length
             omega (array) [rad/s] - Angular velocity of inner and outer race
             E (float) [Pa] - Young's Modulus
             nu (float) - Poisson's ratio
@@ -45,9 +47,11 @@ class Bearing:
         '''
         self.D = np.array([InnerRaceDia, OuterRaceDia])
         self.d = RollerDia
+        self.r = RollerDia / 2
         self.l = RollerLength
         self.n = NoOfRollers
         self.w_z = MaxLoad
+        self.w_z_prime = self.w_z / self.l
         self.omega = np.array([InnerRaceSpeed, OuterRaceSpeed])
         self.E = EModulus
         self.nu = PoissonRatio
@@ -513,18 +517,60 @@ class Bearing:
         
         Attributes:
             u (array) [m/s] - Velocity of the inner and outer track
-            u_bar (float) [m/s] - Mean surface velocity
+            u_bar (float) [m/s] - Mean surface velocity for inner race
         '''
-        self.u = np.array([9,9])
-        self.u_bar = np.mean(self.u)
+        d_e = 1/2 * (self.D[0] + self.D[1])
+        self.u = np.zeros(2)
+        self.u[0] = d_e * (self.omega[0] - self.omega[1]) / 4 * (1 + self.d**2/d_e**2) # W11S16
+        self.u[1] = d_e * (self.omega[1] - self.omega[0]) / 4 * (1 + self.d**2/d_e**2) # W11S16
+        
+        self.u_bar = (self.u[0] + self.u[0]) / 2
 
         if printbool:
-            print(f'Velocity of the inner track: u_i = {self.u[0]:.3g} m/s')
-            print(f'Velocity of the outer track: u_o = {self.u[1]:.3g} m/s')
+            print(f'Velocity of the inner race: u_ia = {self.u[0]:.3g} m/s')
+            print(f'Velocity of the outer race: u_oa = {self.u[1]:.3g} m/s') 
             print(f'Mean surface velocity: u_bar = {self.u_bar:.3g} m/s')
 
 
-    def finite_difference(self, Nx:int=10, plotbool:bool=False, printbool:bool=False)->None:
+    def infinily_wide_filmthickness(self, printbool:bool=False)->None:
+        '''
+        Calculates the film thickness for the infinitely wide solution
+
+        Args:
+            printbool (bool) - Prints the film thickness if True
+        
+        Attributes:
+            h_min_i (array) [m] - Minimum film thickness of the inner track
+            h_min_o (array) [m] - Minimum film thickness of the outer track
+        '''
+        # w_z_prime = 2.44 * eta_0 * (u_a + u_b) * r / h_min    # 16.26
+        self.h_min = 2.44 * self.eta_0 * (self.u + self.u) * self.r/self.w_z_prime # (16.26)
+
+        if printbool:
+            print(f'Infinitely wide film thickness for inner track: h_min_i = {self.h_min[0]:.3g} m')
+            print(f'Infinitely wide film thickness for outer track: h_min_o = {self.h_min[1]:.3g} m')
+    
+
+    def finite_wide_filmthickness(self, printbool:bool=False)->None:
+        '''
+        Calculates the film thickness for the finite wide solution
+
+        Args:
+            printbool (bool) - Prints the film thickness if True
+        
+        Attributes:
+            h_min_i (array) [m] - Minimum film thickness of the inner track
+            h_min_o (array) [m] - Minimum film thickness of the outer track
+        '''
+        # w_z = eta_0 * (u_a + u_b) * l**3 / (4 * h_min**2)
+        self.h_min = np.sqrt(self.w_z * self.eta_0 * self.l * (self.u + self.u)) * self.l / (2 * self.w_z) # (16.35)
+    
+        if printbool:
+            print(f'Finite wide film thickness for inner track: h_min_i = {self.h_min[0]:.3g} m')
+            print(f'Finite wide film thickness for outer track: h_min_o = {self.h_min[1]:.3g} m')
+
+
+    def finite_difference(self, Nx:int=100, plotbool:bool=False, printbool:bool=False)->None:
         '''
         Solves the Reynolds equation with a finite difference method
         
@@ -533,75 +579,96 @@ class Bearing:
             plotbool (bool) - Plots the solution if True
             printbool (bool) - Prints the solution if True
         '''
-        X, Y = np.meshgrid(np.linspace(0, 1, Nx), np.linspace(0, 1, Nx))
+        h_min = self.h_min[0]
+        lam = self.l / self.d # 16.40
 
-        x_ = X.flatten('F')        
-        
+        X = np.linspace(0, 1, Nx) # p. 403
+        Y = np.linspace(-1, 1, Nx) # p. 403
+
         dX = X[1] - X[0]
         dY = Y[1] - Y[0]
 
-        h0 = 0.03e-6    # Assumed minimum film thickness [m]
+        H = np.zeros((Nx, Nx))
+        H_ = np.zeros((Nx, Nx))
+        H__ = np.zeros((Nx, Nx))
+        P = np.zeros((Nx, Nx))
+
+        for i in range(Nx):
+            H[i, :] = 1 + self.r / (2 * h_min) * (X[i] - 1)**2 # 16.41
+            H_[i, :] = self.r / h_min * (X[i] - 1)
+            H__[i, :] = np.sqrt(2) * (self.r * (X[i] - 1)**2 + h_min) * self.r / (h_min**2 * np.sqrt(self.r / h_min * (X[i] - 1)**2 +2))
+                
+        H = H.flatten('F')
+        H_ = H_.flatten('F')
+        H__ = H__.flatten('F')
 
         M = sps.eye(Nx**2, format='csr') # Matrix
-        rhs = np.zeros(Nx**2) # Right hand side
-
-        H = 1 + (self.d/2)/(2*h0) * (x_ - 1)**2
-        lam = self.l / self.d
-
-        r = self.d/2
-
-        for i in range(1, Nx - 1):
-            for j in range(1, Nx - 1):
+        rhs = np.zeros(Nx**2) # Right hand side        
+        
+        for i in range(1, Nx-1):
+            for j in range(1, Nx-1):
                 c = j + i * Nx
-                n = c + 1
-                s = c - 1
-                e = j + Nx * (i + 1)
-                w = j + Nx * (i - 1)
+                n = c + 1   # North
+                s = c - 1   # South
+                e = j + Nx*(i+1)   # East
+                w = j + Nx*(i-1)   # West
 
-                M[c, c] = (-2 / dX**2 - 2 / (lam**2 * dY**2) - 3 * (((np.sqrt(H[e]) - np.sqrt(H[w])) * (H[e] - H[w])) / 4 + np.sqrt(H[c]) * (H[w] - 2 * H[c] + H[e])) / (2 * H[c]**(3/2) * dX**2))
-                M[c, n] = 1 / (lam**2 * dY**2)
-                M[c, s] = 1 / (lam**2 * dY**2)
-                M[c, e] = 1 / dX**2
-                M[c, w] = 1 / dX**2
+                M[c, c] = -2/dX**2 - 1 / lam**2 * 2 / dY**2 - 3 / 2 * 1 / H[c]**(3/2) * H__[c]
+                M[c, e] = 1/dX**2
+                M[c, w] = 1/dX**2
+                M[c, n] = 1/lam**2 * 1/dY**2
+                M[c, s] = 1/lam**2 * 1/dY**2
 
-                rhs[c] = 1 / (H[c]**(3/2)) * (H[e] - H[w]) / (2 * dX)
+                rhs[c] = 1 / H[c]**(3/2) * H_[c] 
 
-        g = sps.linalg.spsolve(M, rhs)
-        G = np.reshape(g, (Nx, Nx))
-        P = G * (H**(-3/2))
-        p = (6 * self.eta_0 * (self.u[0] + self.u[1]) * r * P) / (h0**2)
-        h = h0 * H
 
-        # Visc
-        p_new = -(1/self.xi) * np.log(np.abs(1 - self.xi * p))
-        eta_new = self.eta_0 * np.exp(self.xi * p_new)
+        Tau = sps.linalg.spsolve(M, rhs)
+
+        P = Tau / H**(3/2) # 16.44
+        P = P.reshape((Nx, Nx))
+        
+        self.p = 6 * self.eta_0 * (self.u[0] + self.u[0]) * self.r * P / h_min**2 # 16.38
+        
+        h = H * self.h_min[0] # 16.38
+        self.h = h.reshape((Nx, Nx))
+        
+        x = X * self.r - self.r # 16.38
+        y = Y * self.l/2 # 16.38
+
+        self.w_fine = np.trapezoid(np.trapezoid(self.p, x), y) 
+        self.h_min_fine = np.min(self.h)
+
+        x, y = np.meshgrid(x, y)
+
+        if printbool:
+            print(f'The total load from FD is: {self.w_fine:.3g} N')
+            print(f'The minimum film thickness from FD is: {self.h_min_fine:.3g} m')
+            print(f'The maximum pressure from FD is: {np.max(self.p):.3g} Pa')
 
         if plotbool:
+            ax = plt.figure().add_subplot(111, projection='3d')
+            ax.plot_surface(x, y, self.p, cmap='viridis')
+            plt.title('Pressure distribution')
+            ax.set_xlabel('x [m]')
+            ax.set_ylabel('y [m]')
+            ax.set_zlabel('Pressure [Pa]')
+
+
             plt.figure()
-            plt.contourf(X, Y, h)
-            plt.colorbar()
+            plt.plot(x[0,:], self.h[0,:])
             plt.title('Film thickness')
-            plt.xlabel('X')
-            plt.ylabel('Y')
+            plt.xlabel('x [m]')
+            plt.ylabel('h [m]')
+            plt.grid()
 
-            plt.figure()
-            plt.contourf(X, Y, p)
-            plt.colorbar()
-            plt.title('Pressure')
-            plt.xlabel('X')
-            plt.ylabel('Y')
 
-            plt.figure()
-            plt.contourf(X, Y, eta_new)
-            plt.colorbar()
-            plt.title('Viscosity')
-            plt.xlabel('X')
-            plt.ylabel('Y')
+
+
 
 
     def dimenionless_speed(self, printbool:bool=False)->None:
         '''
-        Calculates the dimensionless speed parameter for the outer track
+        Calculates the dimensionless speed parameter for the inner track
 
         Args:
             printbool (bool) - Prints the dimensionless speed if True
@@ -609,7 +676,7 @@ class Bearing:
         Attributes:
             U (float) - Dimensionless speed parameter
         '''
-        self.U = self.eta_0 * self.u_bar / (self.E_prime * self.R_x[1]**2) # 18.10
+        self.U = self.eta_0 * self.u_bar / (self.E_prime * self.R_x[0]**2) # 18.10
 
         if printbool:
             print(f'Dimensionless speed parameter: U = {self.U:.3g}')
@@ -617,7 +684,7 @@ class Bearing:
 
     def dimensionless_load(self, printbool:bool=False)->None:
         '''
-        Calculates the dimensionless load parameter for the outer track
+        Calculates the dimensionless load parameter for the inner track
 
         Args:
             printbool (bool) - Prints the dimensionless load if True
@@ -625,7 +692,7 @@ class Bearing:
         Attributes:
             W (float) - Dimensionless load parameter
         '''
-        self.W = self.w_zm / (self.E_prime * self.R_x[1])   # 18.11
+        self.W = self.w_zm / (self.E_prime * self.R_x[0])   # 18.11
 
         if printbool:
             print(f'Dimensionless load parameter: W = {self.W:.3g}')
@@ -633,7 +700,7 @@ class Bearing:
 
     def dimensionless_material(self, printbool:bool=False)->None:
         '''
-        Calculates the dimensionless material parameter for the outer track
+        Calculates the dimensionless material parameter for the inner track
 
         Args:
             printbool (bool) - Prints the dimensionless material parameter if True
@@ -655,14 +722,21 @@ class Bearing:
             printbool (bool) - Prints the pressure spike if True
         
         Attributes:
+            P_sk (float) - non-dimensional pressure spike amplitude
             p_sk (float) [Pa] - Pressure spike amplitude
+            X_sk (float) - non-dimensional pressure spike location
             x_sk (float) [m] - Pressure spike location
         '''
-        self.p_sk = 0.648 * self.W_prime[1]**(0.185) * self.U**(0.275) * self.G**(0.391) * self.E_prime # 18.70
-        self.x_sk = 1.111 * self.W_prime[1]**(0.606) * self.U**(-0.021) * self.G**(0.077) * self.R_x[1] # 18.71
+        self.P_sk = 0.648 * self.W_prime[0]**(0.185) * self.U**(0.275) * self.G**(0.391) # 18.70
+        self.p_sk = self.P_sk * self.E_prime # 18.70
+        
+        self.X_sk = 1.111 * self.W_prime[0]**(0.606) * self.U**(-0.021) * self.G**(0.077) # 18.71 
+        self.x_sk = self.X_sk * self.R_x[0] # 18.71
 
         if printbool:
+            print(f'Non-dimensional pressure spike amplitude: P_sk = {self.P_sk:.3g}')
             print(f'Pressure spike amplitude: p_sk = {self.p_sk:.3g} Pa')
+            print(f'Non-dimensional pressure spike location: X_sk = {self.X_sk:.3g}')
             print(f'Pressure spike location: x_sk = {self.x_sk:.3g} m')
 
 
@@ -674,14 +748,21 @@ class Bearing:
             printbool (bool) - Prints the minimum film thickness if True
         
         Attributes:
+            H_min (float) - Non-dimensional minimum film thickness
             h_min (float) [m] - Minimum film thickness
+            X_min (float) - Non-dimensional minimum film thickness location
             x_min (float) [m] - Minimum film thickness location
         '''
-        self.h_min = 1.714 * self.W_prime[1]**(-0.128) * self.U**(0.694) * self.G**(0.568) * self.R_x[1] # 18.72
-        self.x_min = 1.439 * self.W_prime[1]**(0.548) * self.U**(-0.011) * self.G**(0.026) * self.R_x[1] # 18.75
+        self.H_min = 1.714 * self.W_prime[0]**(-0.128) * self.U**(0.694) * self.G**(0.568)
+        self.h_min = self.H_min * self.R_x[0]
+
+        self.X_min = 1.439 * self.W_prime[0]**(0.548) * self.U**(-0.011) * self.G**(0.026) # 18.75
+        self.x_min = self.X_min * self.R_x[0]
 
         if printbool:
+            print(f'Non-dimensional minimum film thickness: H_min = {self.H_min:.3g}')
             print(f'Minimum film thickness: h_min = {self.h_min:.3g} m')
+            print(f'Non-dimensional minimum film thickness location: X_min = {self.X_min:.3g}')
             print(f'Minimum film thickness location: x_min = {self.x_min:.3g} m')
 
 
@@ -693,11 +774,14 @@ class Bearing:
             printbool (bool) - Prints the center of pressure if True
         
         Attributes:
-            x_cp (float) - Center of pressure
+            X_cp (float) - Center of pressure
+            x_cp (float) [m] - Center of pressure
         '''
-        self.x_cp = -3.595 * self.W_prime[1]**(-1.019) * self.U**(0.638) * self.G**(-0.358) * self.R_x[1] # 18.76
+        self.X_cp = -3.595 * self.W_prime[0]**(-1.019) * self.U**(0.638) * self.G**(-0.358)
+        self.x_cp = self.X_cp * self.R_x[0] 
 
         if printbool:
+            print(f'Non-dimensional center of pressure: X_cp = {self.X_cp:.3g}')
             print(f'Center of pressure: x_cp = {self.x_cp:.3g} m')
 
 
@@ -709,11 +793,14 @@ class Bearing:
             printbool (bool) - Prints the center film thickness if True
         
         Attributes:
-            h_c (float) - Center film thickness
+            H_c (float) - Non-dimensional center film thickness
+            h_c (float) [m] - Center film thickness
         '''
-        self.h_c = 2.922 * self.W_prime[1]**(-0.166) * self.U**(0.692) * self.G**(0.470) * self.R_x[1] # 18.74
+        self.H_c = 2.922 * self.W_prime[0]**(-0.166) * self.U**(0.692) * self.G**(0.470)
+        self.h_c = self.H_c * self.R_x[0]
 
         if printbool:
+            print(f'Non-dimensional center film thickness: H_c = {self.H_c:.3g}')
             print(f'Center film thickness: h_c = {self.h_c:.3g} m')
 
 
@@ -733,10 +820,10 @@ if __name__ == '__main__':
         Q1.min_film_thickness(printbool=True)
 
 
-    if True: # Question 2
+    if False: # Question 2
         print('Question 2')
         Q2 = Bearing()
-        Q2.max_load()
+        Q2.max_load(printbool=True)
         Q2.min_film_thickness()
         Q2.effective_radius()
         Q2.effective_elastic_modulus()
@@ -760,15 +847,42 @@ if __name__ == '__main__':
         Q2.D[1] = 85.51e-3    # [m]
         Q2.clearance(printbool=True)
         Q2.max_load(printbool=True)
+        Q2.effective_radius()
+        Q2.effective_elastic_modulus()
+        Q2.rectangular_dimensionless_load()
+        Q2.rectangular_max_deformation(printbool=True)
+        Q2.rectangular_max_pressure(printbool=True)
         
+        Q2.max_load(printbool=True)
+        Q2.effective_radius()
+        Q2.effective_elastic_modulus()
+        Q2.rectangular_dimensionless_load()
+        Q2.rectangular_max_deformation(printbool=True)
+        Q2.rectangular_max_pressure(printbool=True)
+
+        Q2.max_load(printbool=True)
+        Q2.effective_radius()
+        Q2.effective_elastic_modulus()
+        Q2.rectangular_dimensionless_load()
+        Q2.rectangular_max_deformation(printbool=True)
+        Q2.rectangular_max_pressure(printbool=True)
+
         plt.show()
 
 
-    if False: # Question 3
+    if True: # Question 3
         print('Question 3')
         Q3 = Bearing()
+        print("Part 1")
         Q3.velocity(printbool=True)
-        Q3.finite_difference(Nx=10, plotbool=True)
+        Q3.infinily_wide_filmthickness(printbool=True)
+        # Q3.finite_wide_filmthickness(printbool=True)
+
+        print("Part 2")
+        Q3.finite_difference(plotbool=True, printbool=True)
+        # Highly dependant on the number of points in the finite difference method
+
+        plt.show()
 
 
     if False: # Question 4
@@ -780,6 +894,9 @@ if __name__ == '__main__':
         Q4.velocity()
         Q4.dimenionless_speed()
         Q4.rectangular_dimensionless_load()
+        Q4.rectangular_contact_width()
+        Q4.rectangular_max_pressure()
+        Q4.rectangular_pressure_distribution()
         Q4.dimensionless_material()
 
         print("Part 1")
@@ -790,15 +907,16 @@ if __name__ == '__main__':
 
         print("Part 2")
         plt.figure()
-        plt.plot()
-        plt.scatter(Q4.x_sk, Q4.p_sk, label='Pressure spike')
-        plt.scatter(Q4.x_min, Q4.h_min, label='Minimum film thickness')
-        plt.scatter(Q4.x_cp, 0, label='Center of pressure')
-        plt.scatter(Q4.x_cp, Q4.h_c, label='Center film thickness')
-        plt.xlabel('x [m]')
-        plt.ylabel('y [m]')
+        # plt.xlim(-2,2)
+        # plt.ylim(0,2)
+        plt.scatter(2*Q4.x_sk/Q4.D_x[0], Q4.p_sk/Q4.p_m[0], label='Pressure spike')
+        plt.scatter(Q4.X_min, Q4.H_min, label='Minimum film thickness')
+        plt.scatter(2*Q4.x_cp/Q4.D_x[0], np.max(Q4.p/Q4.p_m[0]), label='Center of pressure')
+        plt.scatter(Q4.X_cp, Q4.H_c, label='Center film thickness')
+        plt.xlabel('X')
         plt.legend()
         plt.grid()
         plt.show()
+
 
 
