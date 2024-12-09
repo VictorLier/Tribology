@@ -570,23 +570,24 @@ class Bearing:
             print(f'Finite wide film thickness for outer track: h_min_o = {self.h_min[1]:.3g} m')
 
 
-    def load_finite(self, printbool:bool=False)->None:
+    def load_finite(self, p, printbool:bool=False)->None:
         '''
         Calculates the total load from the FD solution
 
         Args:
+            p (array) [Pa] - Pressure distribution
             printbool (bool) - Prints the total load if True
         
         Attributes:
             w_fine (float) [N] - Total load from FD
         '''
-        self.w_fine = np.trapezoid(np.trapezoid(self.p, self.x[0,:]), self.y[:,0]) # 16.38
+        self.w_fine = np.trapezoid(np.trapezoid(p, self.x[0,:]), self.y[:,0]) # 16.38
 
         if printbool:
             print(f'The total load from FD is: {self.w_fine:.3g} N')
 
 
-    def finite_difference(self, Nx:int=100, plotbool:bool=False, printbool:bool=False)->None:
+    def finite_difference(self, Nx:int=25, plotbool:bool=False, printbool:bool=False)->None:
         '''
         Solves the Reynolds equation with a finite difference method
         
@@ -607,7 +608,7 @@ class Bearing:
         h_min = self.h_min[0]
         lam = self.l / self.d # 16.40
 
-        X = np.linspace(0.8, 1, Nx) # p. 403
+        X = np.linspace(0.9, 1, Nx) # p. 403
         Y = np.linspace(-1, 1, Nx) # p. 403
 
         dX = X[1] - X[0]
@@ -660,11 +661,13 @@ class Bearing:
         x = X * self.r - self.r # 16.38
         y = Y * self.l/2 # 16.38
 
+        self.X, self.Y = np.meshgrid(X, Y)
+
         self.h_min_fine = np.min(self.h)
 
         self.x, self.y = np.meshgrid(x, y)
 
-        self.load_finite()
+        self.load_finite(p=self.p)
 
         if printbool:
             print(f'The total load from FD is: {self.w_fine:.3g} N')
@@ -687,6 +690,9 @@ class Bearing:
             plt.ylabel('h [m]')
             plt.grid()
 
+            np.savetxt('Assignment3/data/3/pressure_distribution_FD.txt', np.array([self.X.flatten(), self.Y.flatten(), self.p.flatten()]).T)
+            np.savetxt('Assignment3/data/3/film_thickness_FD.txt', np.array([X, self.h[0,:]]).T)
+
 
     def finite_visc(self, plotbool:bool=False, printbool:bool=False)->None:
         '''
@@ -701,17 +707,24 @@ class Bearing:
         '''
         self.eta = self.eta_0 * np.exp(self.xi * self.p) # 18.3
 
+        delta_eta = self.eta - self.eta_0
+
+        rel_change = delta_eta / self.eta_0
+
         if printbool:
-            print(f'Minimum viscosity: {np.min(self.eta):.3g} Pa s')
-            print(f'The change in viscosity: {np.max(self.eta) - self.eta_0:.3g} Pa s')
+            print(f'Maximum viscosity: {np.max(self.eta):.3g} Pa s')
+            print(f'The biggest change in viscosity: {np.max(self.eta - self.eta_0):.3g} Pa s')
+            print(f'The biggest relative change in viscosity: {np.max(rel_change):.3g}')
 
         if plotbool:
             ax = plt.figure().add_subplot(111, projection='3d')
-            ax.plot_surface(self.x, self.y, self.eta, cmap='viridis')
+            ax.plot_surface(self.x, self.y, delta_eta, cmap='viridis')
             plt.title('Viscosity distribution')
             ax.set_xlabel('x [m]')
             ax.set_ylabel('y [m]')
             ax.set_zlabel('Viscosity [Pa s]')
+
+            np.savetxt('Assignment3/data/3/viscosity_FD.txt', np.array([self.X.flatten(), self.Y.flatten(), rel_change.flatten()]).T)
 
 
     def finit_pres(self, plotbool:bool=False, printbool:bool=False)->None:
@@ -726,18 +739,27 @@ class Bearing:
             p_visc (array) [Pa] - Pressure distribution
         '''
         p_star = 1 - np.exp(-self.xi * self.p) # 18.3
-        self.p = -1/self.xi * np.log(1 - self.xi * self.p) # 18.6
+        self.p_visc = -1/self.xi * np.log(1 - self.xi * self.p) # 18.6
+
+        delta_p = self.p_visc - self.p
+        relative_change = delta_p / self.p
+        relative_change = np.nan_to_num(relative_change, 0)
+        # relative_change[relative_change == 0] = 1
 
         if printbool:
             print(f'Maximum pressure: {np.max(self.p):.3g} Pa')
+            print(f'The biggest change in pressure: {np.max(delta_p):.3g} Pa')
+            print(f'The biggest relative change in pressure: {np.max(relative_change):.3g}')
 
         if plotbool:
             ax = plt.figure().add_subplot(111, projection='3d')
-            ax.plot_surface(self.x, self.y, self.p, cmap='viridis')
+            ax.plot_surface(self.x, self.y, self.p_visc, cmap='viridis')
             plt.title('Pressure distribution with viscios effects')
             ax.set_xlabel('x [m]')
             ax.set_ylabel('y [m]')
             ax.set_zlabel('Pressure [Pa]')
+
+            np.savetxt('Assignment3/data/3/pressure_distribution_visc.txt', np.array([self.X.flatten(), self.Y.flatten(), relative_change.flatten()]).T)
 
 
     def dimenionless_speed(self, printbool:bool=False)->None:
@@ -967,7 +989,7 @@ if __name__ == '__main__':
         plt.show()
 
 
-    if False: # Question 3
+    if True: # Question 3
         print('Question 3')
         Q3 = Bearing()
         print("Part 1")
@@ -982,12 +1004,12 @@ if __name__ == '__main__':
         print("Part 3")
         Q3.finite_visc(plotbool=True, printbool=True)
         Q3.finit_pres(plotbool=True, printbool=True)
-        Q3.load_finite(printbool=True)
+        Q3.load_finite(p=Q3.p_visc, printbool=True)
 
         plt.show()
 
 
-    if True: # Question 4
+    if False: # Question 4
         print('Question 4')
         Q4 = Bearing()
         Q4.run_4()
@@ -1009,6 +1031,13 @@ if __name__ == '__main__':
         plt.legend()
         plt.grid()
 
+        np.savetxt('Assignment3/data/4.1/pressure_distribution_full.txt', np.array([(2*Q4.x[:,0]+Q4.x_cp)/Q4.D_x[0], Q4.p[:,0]/Q4.p_m[0]]).T)
+        np.savetxt('Assignment3/data/4.1/pressure_spike.txt', np.array([[2*Q4.x_sk/Q4.D_x[0], Q4.p_sk/Q4.p_m[0]]]))
+        np.savetxt('Assignment3/data/4.1/min_film_thickness.txt', np.array([[2*Q4.x_min/Q4.D_x[0], Q4.h_min_/Q4.h_min_]]))
+        np.savetxt('Assignment3/data/4.1/center_film_thickness.txt', np.array([[2*Q4.x_cp/Q4.D_x[0], Q4.h_c/Q4.h_min_]]))
+        np.savetxt('Assignment3/data/4.1/central_pressure.txt', np.array([[2*Q4.x_cp/Q4.D_x[0], np.max(Q4.p)/Q4.p_m[0]]]))
+
+
         print("Half")
         Q4_half = Bearing(MaxLoad=8000/2)
         Q4_half.run_4(printbool=True)
@@ -1021,14 +1050,27 @@ if __name__ == '__main__':
         plt.plot(Q4_half.x[:,0]/Q4_half.R_x[0] + Q4_half.X_cp, Q4_half.p[:,0]/Q4_half.E_prime, label='Half load')
         plt.plot(Q4_quart.x[:,0]/Q4_quart.R_x[0] + Q4_quart.X_cp, Q4_quart.p[:,0]/Q4_quart.E_prime, label='Quarter load')
 
+        x_peak = [Q4.x_sk/Q4.R_x[0], Q4_half.x_sk/Q4_half.R_x[0], Q4_quart.x_sk/Q4_quart.R_x[0]]
+        p_peak = [Q4.p_sk/Q4.E_prime, Q4_half.p_sk/Q4_half.E_prime, Q4_quart.p_sk/Q4_quart.E_prime]
+        x_center = [Q4.x_cp/Q4.R_x[0], Q4_half.x_cp/Q4_half.R_x[0], Q4_quart.x_cp/Q4_quart.R_x[0]]
+        p_center = [np.max(Q4.p)/Q4.E_prime, np.max(Q4_half.p)/Q4_half.E_prime, np.max(Q4_quart.p)/Q4_quart.E_prime]
+        plt.scatter(x_peak, p_peak, label='Pressure spike')
+        plt.scatter(x_center, p_center, label='Central pressure')
 
-        # plt.scatter(x_sk, p_sk, label='Pressure spike')
-        # plt.plot(Q4.x[:,0]/Q4.R_x[0]+ x_plus[0], Q4.p[:,0]/Q4.E_prime, label='Pressure distribution')
-        # plt.plot(Q4.x[:,0]/Q4.R_x[0] + x_plus[1], Q4.p[:,0]/Q4.E_prime / 2, label='Pressure distribution')
-        # plt.plot(Q4.x[:,0]/Q4.R_x[0] + x_plus[2], Q4.p[:,0]/Q4.E_prime / 4, label='Pressure distribution')
         plt.xlabel('X')
         plt.ylabel('P')
         plt.legend()
         plt.grid()
+
+        np.savetxt('Assignment3/data/4.2/pressure_distribution_full.txt', np.array([Q4.x[:,0]/Q4.R_x[0] + Q4.X_cp, Q4.p[:,0]/Q4.E_prime]).T)
+        np.savetxt('Assignment3/data/4.2/pressure_distribution_half.txt', np.array([Q4_half.x[:,0]/Q4_half.R_x[0] + Q4_half.X_cp, Q4_half.p[:,0]/Q4_half.E_prime]).T)
+        np.savetxt('Assignment3/data/4.2/pressure_distribution_quart.txt', np.array([Q4_quart.x[:,0]/Q4_quart.R_x[0] + Q4_quart.X_cp, Q4_quart.p[:,0]/Q4_quart.E_prime]).T)
+        np.savetxt('Assignment3/data/4.2/pressure_spike.txt', np.array([x_peak, p_peak]).T)
+        np.savetxt('Assignment3/data/4.2/central_pressure.txt', np.array([x_center, p_center]).T)
+
+
+
         plt.show()
+
+
 
