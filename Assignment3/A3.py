@@ -747,7 +747,7 @@ class Bearing:
         # relative_change[relative_change == 0] = 1
 
         if printbool:
-            print(f'Maximum pressure: {np.max(self.p):.3g} Pa')
+            print(f'Maximum pressure: {np.max(self.p_visc):.3g} Pa')
             print(f'The biggest change in pressure: {np.max(delta_p):.3g} Pa')
             print(f'The biggest relative change in pressure: {np.max(relative_change):.3g}')
 
@@ -778,18 +778,17 @@ class Bearing:
             print(f'Dimensionless speed parameter: U = {self.U:.3g}')
 
 
-    def dimensionless_load(self, divedeLoad:float=1, printbool:bool=False)->None:
+    def dimensionless_load(self, printbool:bool=False)->None:
         '''
         Calculates the dimensionless load parameter for the inner track
 
         Args:
             printbool (bool) - Prints the dimensionless load if True
-            divideLoad (float) - Divides the load with a factor (default: 1)
             
         Attributes:
             W (float) - Dimensionless load parameter
         '''
-        self.W = (self.w_zm_prime/divedeLoad) / (self.E_prime * self.R_x[0])   # 18.11
+        self.W = (self.w_zm_prime) / (self.E_prime * self.R_x[0])   # 18.11
 
         if printbool:
             print(f'Dimensionless load parameter: W = {self.W:.3g}')
@@ -908,7 +907,9 @@ class Bearing:
         Args:
             printbool (bool) - Prints the results if True
         '''
-        self.max_load(printbool=printbool)
+        if printbool:
+            print(f'The total load is {self.w_z:.3g} N')
+        self.max_load()
         self.effective_elastic_modulus()
         self.effective_radius()
         self.velocity()
@@ -989,7 +990,7 @@ if __name__ == '__main__':
         plt.show()
 
 
-    if True: # Question 3
+    if False: # Question 3
         print('Question 3')
         Q3 = Bearing()
         print("Part 1")
@@ -1009,7 +1010,7 @@ if __name__ == '__main__':
         plt.show()
 
 
-    if False: # Question 4
+    if True: # Question 4
         print('Question 4')
         Q4 = Bearing()
         Q4.run_4()
